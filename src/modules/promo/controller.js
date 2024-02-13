@@ -41,7 +41,7 @@ const PromoController = () => {
 			if (result.rows.length === 0) {
 				res.status(404).json({ message: 'Promo not found' });
 			} else {
-				res.json({ promo: result.rows[0] });
+				res.status(200).json({ promo: result.rows[0] });
 			}
 		} catch (error) {
 			res.status(500).json({ error });
