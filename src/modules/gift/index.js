@@ -5,8 +5,8 @@ const giftController = require('./controller');
 const giftRouter = new Router();
 
 giftRouter
-	.get('/careers', giftController.getGift)
-	.post('/careers', giftController.createGift)
-	.delete('/careers', giftController.deleteGift);
+	.get('/gift', giftController.getGift)
+	.post('/gift', giftController.createGift)
+	.delete('/gift', giftController.deleteGift);
 
 module.exports = giftRouter;
