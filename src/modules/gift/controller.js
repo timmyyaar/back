@@ -36,7 +36,7 @@ const GiftController = () => {
 				await client.connect();
 
 				const result = await client.query(
-					'INSERT INTO careers(fEmail, fPhone, comment) VALUES($1, $2, $3) RETURNING *',
+					'INSERT INTO gift(fEmail, fPhone, comment) VALUES($1, $2, $3) RETURNING *',
 					[fEmail, fPhone, comment],
 				);
 
