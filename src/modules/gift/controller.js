@@ -31,13 +31,13 @@ const GiftController = () => {
 		const client = getClient();
 
 		try {
-			const { fEmail, fPhone, comment, sEmail, sName } = req.body;
-			if (fEmail && fPhone && comment && sEmail && sName) {
+			const { fEmail, fPhone, comment } = req.body;
+			if (fEmail && fPhone && comment) {
 				await client.connect();
 
 				const result = await client.query(
-					'INSERT INTO careers(fEmail, fPhone, comment, sEmail, sName) VALUES($1, $2, $3, $4, $5) RETURNING *',
-					[fEmail, fPhone, comment, sEmail, sName],
+					'INSERT INTO careers(fEmail, fPhone, comment) VALUES($1, $2, $3) RETURNING *',
+					[fEmail, fPhone, comment],
 				);
 
 				res.status(200).json({ gift: result.rows[0] });
