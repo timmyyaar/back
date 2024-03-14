@@ -31,16 +31,30 @@ const OrderController = () => {
 		const client = getClient();
 
 		try {
-			// eslint-disable-next-line max-len
-			const { price, promo, estimate, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService } = req.body;
+			const {
+				price,
+				promo,
+				estimate,
+				address,
+				date,
+				requestPreviousCleaner,
+				onlinePayment,
+				title,
+				counter,
+				subService = '',
+				secTitle = '',
+				secCounter = '',
+				secSubService = '',
+			} = req.body;
+
 			// eslint-disable-next-line max-len
 			if (price && address && estimate && date && requestPreviousCleaner && onlinePayment && title && counter) {
 				await client.connect();
-				// eslint-disable-next-line max-len
-				const values = [price, promo, estimate, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService];
-				const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
-				const query = `INSERT INTO "order" (price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService, estimate) VALUES (${placeholders}) RETURNING *`;
-				const result = await client.query(query, values);
+				const result = await client.query(
+					'INSERT INTO "order" (price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService, estimate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+					// eslint-disable-next-line max-len
+					[price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService, estimate],
+				);
 
 				res.status(200).json({ order: result.rows[0] });
 			} else {
