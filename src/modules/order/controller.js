@@ -19,7 +19,7 @@ const OrderController = () => {
 			await client.connect();
 			const result = await client.query('SELECT * FROM order');
 
-			res.json({ gift: result.rows });
+			res.json({ order: result.rows });
 		} catch (error) {
 			res.status(500).json({ error });
 		} finally {
