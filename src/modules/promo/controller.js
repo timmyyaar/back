@@ -17,7 +17,7 @@ const PromoController = () => {
 
 		try {
 			await client.connect();
-			const result = await client.query('SELECT * FROM promo');
+			const result = await client.query('SELECT * FROM "promo"');
 
 			res.json({ promo: result.rows });
 		} catch (error) {

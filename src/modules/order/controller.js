@@ -17,7 +17,7 @@ const OrderController = () => {
 
 		try {
 			await client.connect();
-			const result = await client.query('SELECT * FROM order');
+			const result = await client.query('SELECT * FROM "order"');
 
 			res.json({ order: result.rows });
 		} catch (error) {
