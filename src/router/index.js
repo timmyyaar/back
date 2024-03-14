@@ -4,6 +4,7 @@ const careersRouter = require('../modules/career');
 const localesRouter = require('../modules/locales');
 const promoRouter = require('../modules/promo');
 const giftRouter = require('../modules/gift');
+const orderRouter = require('../modules/order');
 
 const tasksRouter = require('../modules/tasks');
 
@@ -14,6 +15,7 @@ router
 	.use(localesRouter)
 	.use(promoRouter)
 	.use(giftRouter)
+	.use(orderRouter)
 	.use(tasksRouter);
 
 module.exports = router;
