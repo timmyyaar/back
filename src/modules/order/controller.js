@@ -32,15 +32,15 @@ const OrderController = () => {
 
 		try {
 			// eslint-disable-next-line max-len
-			const { price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService } = req.body;
+			const { price, promo, estimate, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService } = req.body;
 			// eslint-disable-next-line max-len
-			if (price && address && date && requestPreviousCleaner && onlinePayment && title && counter && subService && secTitle && secCounter && secSubService) {
+			if (price && address && estimate && date && requestPreviousCleaner && onlinePayment && title && counter && subService && secTitle && secCounter && secSubService) {
 				await client.connect();
 
 				const result = await client.query(
-					'INSERT INTO "order" (price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+					'INSERT INTO "order" (price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService, estimate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
 					// eslint-disable-next-line max-len
-					[price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService],
+					[price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService, estimate],
 				);
 
 				res.status(200).json({ order: result.rows[0] });
