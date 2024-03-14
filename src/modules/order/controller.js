@@ -60,9 +60,8 @@ const OrderController = () => {
 		try {
 			const { id } = req.body;
 			await client.connect();
-
 			const result = await client.query(
-				'DELETE FROM order WHERE id = $1 RETURNING *',
+				'DELETE FROM "order" WHERE id = $1 RETURNING *',
 				[id],
 			);
 
