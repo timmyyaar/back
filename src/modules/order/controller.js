@@ -34,7 +34,7 @@ const OrderController = () => {
 			// eslint-disable-next-line max-len
 			const { price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService } = req.body;
 			// eslint-disable-next-line max-len
-			if (price && promo && address && date && requestPreviousCleaner && onlinePayment && title && counter && subService && secTitle && secCounter && secSubService) {
+			if (price && address && date && requestPreviousCleaner && onlinePayment && title && counter && subService && secTitle && secCounter && secSubService) {
 				await client.connect();
 
 				const result = await client.query(
