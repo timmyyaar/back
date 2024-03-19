@@ -18,7 +18,9 @@ const ReviewsController = () => {
 
     try {
       await client.connect();
-      const result = await client.query("SELECT * FROM reviews");
+      const result = await client.query(
+        "SELECT * FROM reviews ORDER BY id ASC"
+      );
 
       res.json(result.rows);
     } catch (error) {
@@ -32,7 +34,7 @@ const ReviewsController = () => {
     const client = getClient();
 
     try {
-      const { rating, name, email, text } = req.body;
+      const { rating, name, email, text, visible } = req.body;
 
       if (rating && name && email && text) {
         if (!constants.EMAIL_REGEX.test(email)) {
@@ -43,7 +45,7 @@ const ReviewsController = () => {
 
         const result = await client.query(
           "INSERT INTO reviews(rating, name, email, text, visible) VALUES($1, $2, $3, $4, $5) RETURNING *",
-          [rating, name, email, text, "0"]
+          [rating, name, email, text, visible ? "1" : "0"]
         );
 
         res.status(200).json(result.rows[0]);
