@@ -32,28 +32,21 @@ const OrderController = () => {
 
 		try {
 			const {
-				price,
-				promo,
-				estimate,
-				address,
-				date,
-				requestPreviousCleaner,
-				onlinePayment,
-				title,
-				counter,
-				subService = '',
-				secTitle = '',
-				secCounter = '',
-				secSubService = '',
+				name, number, email, address, date,
+				onlinePayment = false, requestPreviousCleaner = false, personalData = false,
+				price = '', promo = '', estimate = '',
+				title = '', counter = '', subService = '',
+				secTitle = '', secCounter = '', secSubService = '',
 			} = req.body;
-
-			// eslint-disable-next-line max-len
-			if (price && address && estimate && date && requestPreviousCleaner && onlinePayment && title && counter) {
+			if (name && number && email && address && date) {
 				await client.connect();
 				const result = await client.query(
-					'INSERT INTO "order" (price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService, estimate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
-					// eslint-disable-next-line max-len
-					[price, promo, address, date, requestPreviousCleaner, onlinePayment, title, counter, subService, secTitle, secCounter, secSubService, estimate],
+					'INSERT INTO "order" (name, number, email, address, date, onlinePayment, requestPreviousCleaner, personalData, price, promo, estimate, title, counter, subService, secTitle, secCounter, secSubService) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *',
+					[
+						name, number, email, address, date,
+						onlinePayment, requestPreviousCleaner, personalData, price, promo, estimate,
+						title, counter, subService, secTitle, secCounter, secSubService,
+					],
 				);
 
 				res.status(200).json({ order: result.rows[0] });
