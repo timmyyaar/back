@@ -31,8 +31,8 @@ const CareersController = () => {
 		const client = getClient();
 
 		try {
-			const { name, phone, email, about } = req.body;
-			if (name && phone && email && about) {
+			const { name, phone, email, about = '' } = req.body;
+			if (name && phone && email) {
 				await client.connect();
 
 				const result = await client.query(
