@@ -31,19 +31,15 @@ const GiftController = () => {
     const client = getClient();
 
     try {
-      const { email, phone, comment } = req.body;
-      if (email && phone && comment) {
-        await client.connect();
+      const { email = '', phone = '', comment = '' } = req.body;
+      await client.connect();
 
-        const result = await client.query(
-          "INSERT INTO gift(email, phone, comment) VALUES($1, $2, $3) RETURNING *",
-          [email, phone, comment]
-        );
+      const result = await client.query(
+        "INSERT INTO gift(email, phone, comment) VALUES($1, $2, $3) RETURNING *",
+        [email, phone, comment],
+      );
 
-        res.status(200).json({ gift: result.rows[0] });
-      } else {
-        res.status(422).json({ message: "Unprocessable Entity" });
-      }
+      res.status(200).json({ gift: result.rows[0] });
     } catch (error) {
       res.status(500).json({ error });
     } finally {
