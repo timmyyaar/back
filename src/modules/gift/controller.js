@@ -31,8 +31,8 @@ const GiftController = () => {
 		const client = getClient();
 
 		try {
-			const { fEmail, fPhone, comment } = req.body;
-			if (fEmail && fPhone && comment) {
+			const { fEmail, fPhone, comment = '' } = req.body;
+			if (fEmail && fPhone) {
 				await client.connect();
 
 				const result = await client.query(
