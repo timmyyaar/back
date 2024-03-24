@@ -8,7 +8,7 @@ const orderRouter = new Router();
 
 orderRouter
   .get("/order", verifyToken, orderController.getOrder)
-  .post("/order", verifyToken, orderController.createOrder)
+  .post("/order", orderController.createOrder)
   .delete("/order", verifyToken, orderController.deleteOrder)
   .patch("/order/:id/:cleanerId", verifyToken, orderController.assignOrder);
 
