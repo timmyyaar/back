@@ -56,34 +56,72 @@ const OrderController = () => {
         mainServicePrice,
         secondServicePrice,
       } = req.body;
+
       if (name && number && email && address && date) {
         await client.connect();
-        const result = await client.query(
-          'INSERT INTO "order" (name, number, email, address, date, onlinePayment, requestPreviousCleaner, personalData, price, promo, estimate, title, counter, subService, secTitle, secCounter, secSubService, main_service_price, second_service_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *',
-          [
-            name,
-            number,
-            email,
-            address,
-            date,
-            onlinePayment,
-            requestPreviousCleaner,
-            personalData,
-            price,
-            promo,
-            estimate,
-            title,
-            counter,
-            subService,
-            secTitle,
-            secCounter,
-            secSubService,
-            mainServicePrice,
-            secondServicePrice,
-          ]
-        );
 
-        res.status(200).json({ order: result.rows[0] });
+        if (secTitle) {
+          const result = await client.query(
+            `INSERT INTO "order" 
+              (name, number, email, address, date, onlinePayment, 
+              requestPreviousCleaner, personalData, promo, 
+              estimate, title, counter, subService, price, total_service_price) 
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
+              $12, $13, $14, $19), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $15, 
+              $16, $17, $18, $19) RETURNING *`,
+            [
+              name,
+              number,
+              email,
+              address,
+              date,
+              onlinePayment,
+              requestPreviousCleaner,
+              personalData,
+              promo,
+              estimate,
+              title,
+              counter,
+              subService,
+              mainServicePrice,
+              secTitle,
+              secCounter,
+              secSubService,
+              secondServicePrice,
+              price,
+            ]
+          );
+
+          res.status(200).json({ order: result.rows });
+        } else {
+          const result = await client.query(
+            `INSERT INTO "order" 
+             (name, number, email, address, date, onlinePayment, 
+             requestPreviousCleaner, personalData, price, promo, 
+             estimate, title, counter, subService, total_service_price) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
+             $10, $11, $12, $13, $14, $15) RETURNING *`,
+            [
+              name,
+              number,
+              email,
+              address,
+              date,
+              onlinePayment,
+              requestPreviousCleaner,
+              personalData,
+              mainServicePrice,
+              promo,
+              estimate,
+              title,
+              counter,
+              subService,
+              price,
+            ]
+          );
+
+          res.status(200).json({ order: result.rows[0] });
+        }
       } else {
         res.status(422).json({ message: "Unprocessable Entity" });
       }
