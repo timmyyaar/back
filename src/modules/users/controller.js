@@ -90,6 +90,8 @@ const UsersController = () => {
           res.cookie("authToken", token, {
             maxAge: AUTH_COOKIE_EXPIRATION_TIME,
             httpOnly: true,
+            sameSite: "None",
+            secure: true,
           });
 
           return res.status(201).send({
