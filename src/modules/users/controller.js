@@ -266,6 +266,10 @@ const UsersController = () => {
         "DELETE FROM users WHERE id = $1 RETURNING *",
         [id]
       );
+      await client.query(
+        'UPDATE "order" SET cleaner_id = null WHERE id = $1 RETURNING *',
+        [id]
+      );
 
       res.status(200).json(result.rows[0]);
     } catch (error) {
