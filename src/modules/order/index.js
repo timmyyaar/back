@@ -1,12 +1,15 @@
-const { Router } = require('express');
+const { Router } = require("express");
 
-const orderController = require('./controller');
+const { verifyToken } = require("../../middlewares");
+
+const orderController = require("./controller");
 
 const orderRouter = new Router();
 
 orderRouter
-	.get('/order', orderController.getOrder)
-	.post('/order', orderController.createOrder)
-	.delete('/order', orderController.deleteOrder);
+  .get("/order", verifyToken, orderController.getOrder)
+  .post("/order", verifyToken, orderController.createOrder)
+  .delete("/order", verifyToken, orderController.deleteOrder)
+  .patch("/order/:id/:cleanerId", verifyToken, orderController.assignOrder);
 
 module.exports = orderRouter;
