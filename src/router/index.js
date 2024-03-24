@@ -6,6 +6,7 @@ const promoRouter = require("../modules/promo");
 const giftRouter = require("../modules/gift");
 const orderRouter = require("../modules/order");
 const reviewsRouter = require("../modules/reviews");
+const usersRouter = require("../modules/users");
 
 const tasksRouter = require("../modules/tasks");
 
@@ -18,6 +19,7 @@ router
   .use(giftRouter)
   .use(orderRouter)
   .use(tasksRouter)
-  .use(reviewsRouter);
+  .use(reviewsRouter)
+  .use(usersRouter);
 
 module.exports = router;
