@@ -59,7 +59,7 @@ const OrderController = () => {
       if (name && number && email && address && date) {
         await client.connect();
         const result = await client.query(
-          'INSERT INTO "order" (name, number, email, address, date, onlinePayment, requestPreviousCleaner, personalData, price, promo, estimate, title, counter, subService, secTitle, secCounter, secSubService, mainServicePrice, secondServicePrice) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *',
+          'INSERT INTO "order" (name, number, email, address, date, onlinePayment, requestPreviousCleaner, personalData, price, promo, estimate, title, counter, subService, secTitle, secCounter, secSubService, main_service_price, second_service_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *',
           [
             name,
             number,
