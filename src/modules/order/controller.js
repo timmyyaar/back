@@ -132,8 +132,30 @@ const OrderController = () => {
       }
 
       const result = await client.query(
-        'UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *',
-        [id, cleanerId || null]
+        'UPDATE "order" SET cleaner_id = $2, status = $3 WHERE id = $1 RETURNING *',
+        [id, cleanerId || null, +cleanerId ? "approved" : "created"]
+      );
+
+      res.status(200).json(result.rows[0]);
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
+  const updateOrderStatus = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const id = req.params.id;
+      const status = req.params.status;
+
+      await client.connect();
+
+      const result = await client.query(
+        'UPDATE "order" SET status = $2 WHERE id = $1 RETURNING *',
+        [id, status]
       );
 
       res.status(200).json(result.rows[0]);
@@ -149,6 +171,7 @@ const OrderController = () => {
     createOrder,
     deleteOrder,
     assignOrder,
+    updateOrderStatus,
   };
 };
 
