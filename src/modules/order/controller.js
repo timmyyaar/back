@@ -228,12 +228,77 @@ const OrderController = () => {
     }
   };
 
+  const updateOrder = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const id = req.params.id;
+      const {
+        name,
+        number,
+        email,
+        address,
+        date,
+        onlinePayment,
+        price,
+        estimate,
+        title,
+        counter,
+        subService,
+        total_service_price,
+        total_service_price_original,
+        price_original,
+      } = req.body;
+
+      console.log(id)
+
+      await client.connect();
+
+      const existingOrder = await client.query(
+        'SELECT * FROM "order" WHERE id = $1',
+        [id]
+      );
+      console.log(existingOrder.rows);
+
+      const result = await client.query(
+        `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
+               date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
+               counter = $11, subService = $12, total_service_price = $13,
+               total_service_price_original = $14, price_original = $15 WHERE id = $1 RETURNING *`,
+        [
+          id,
+          name,
+          number,
+          email,
+          address,
+          date,
+          onlinePayment,
+          price,
+          estimate,
+          title,
+          counter,
+          subService,
+          total_service_price,
+          total_service_price_original,
+          price_original,
+        ]
+      );
+
+      res.status(200).json(result.rows[0]);
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
   return {
     getOrder,
     createOrder,
     deleteOrder,
     assignOrder,
     updateOrderStatus,
+    updateOrder,
   };
 };
 
