@@ -90,6 +90,7 @@ const UsersController = () => {
           res.cookie("authToken", token, {
             maxAge: AUTH_COOKIE_EXPIRATION_TIME,
             httpOnly: true,
+            domain: 'takeutime.pl',
             secure: true,
           });
 
