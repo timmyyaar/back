@@ -63,6 +63,17 @@ const OrderController = () => {
       if (name && number && email && address && date) {
         await client.connect();
 
+        if (promo) {
+          const isPromoUsed = await client.query(
+            'SELECT * FROM "order" WHERE (promo = $1) AND (address = $2 OR number = $3)',
+            [promo, address, number]
+          );
+
+          if (isPromoUsed.rows[0]) {
+            return res.status(409).send("Promo already used!");
+          }
+        }
+
         if (secTitle) {
           const result = await client.query(
             `INSERT INTO "order" 
