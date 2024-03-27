@@ -7,7 +7,7 @@ const { Client } = require("pg");
 
 const env = require("../../helpers/environments");
 
-const AUTH_COOKIE_EXPIRATION_TIME = 24 * 60 * 60 * 1000;
+const AUTH_COOKIE_EXPIRATION_TIME = 7 * 24 * 60 * 60 * 1000;
 
 const UsersController = () => {
   const getClient = () => {
