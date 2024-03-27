@@ -23,7 +23,7 @@ const OrderController = () => {
         'SELECT * FROM "order" ORDER BY id DESC'
       );
 
-      res.json({ order: result.rows });
+      res.json(result.rows);
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -157,14 +157,13 @@ const OrderController = () => {
     const client = getClient();
 
     try {
-      const { id } = req.body;
-      await client.connect();
-      const result = await client.query(
-        'DELETE FROM "order" WHERE id = $1 RETURNING *',
-        [id]
-      );
+      const { id } = req.params;
 
-      res.status(200).json({ message: "Order deleted", gift: result.rows });
+      await client.connect();
+
+      await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
+
+      res.status(200).json("Order deleted");
     } catch (error) {
       res.status(500).json({ error });
     } finally {
