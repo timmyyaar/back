@@ -244,7 +244,7 @@ const OrderController = () => {
       const updatedRow = result.rows[0];
 
       if (status === ORDER_STATUS.APPROVED) {
-        await sendTelegramMessage(updatedRow.date, APPROVED_ORDERS_CHANNEL_ID);
+        //await sendTelegramMessage(updatedRow.date, APPROVED_ORDERS_CHANNEL_ID);
       }
 
       res.status(200).json(updatedRow);
