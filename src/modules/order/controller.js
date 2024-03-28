@@ -1,8 +1,25 @@
 const { Client } = require("pg");
 
-const { ROLES } = require("../../constants");
+const {
+  ROLES,
+  CREATED_ORDERS_CHANNEL_ID,
+  APPROVED_ORDERS_CHANNEL_ID,
+  ORDER_STATUS,
+} = require("../../constants");
 
 const env = require("../../helpers/environments");
+
+const sendTelegramMessage = async (date, channel) => {
+  await fetch(
+    `https://api.telegram.org/bot${env.getEnvironment(
+      "TELEGRAM_BOT_ID"
+    )}/sendMessage?` +
+      new URLSearchParams({
+        chat_id: channel,
+        text: `New order!\n${date.replaceAll("/", ".").replace(" ", ", ")}`,
+      })
+  );
+};
 
 const OrderController = () => {
   const getClient = () => {
@@ -110,6 +127,8 @@ const OrderController = () => {
             ]
           );
 
+          await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+
           res.status(200).json({ order: result.rows });
         } else {
           const result = await client.query(
@@ -140,6 +159,8 @@ const OrderController = () => {
               priceOriginal,
             ]
           );
+
+          await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
 
           res.status(200).json({ order: result.rows[0] });
         }
@@ -220,7 +241,13 @@ const OrderController = () => {
         [id, status]
       );
 
-      res.status(200).json(result.rows[0]);
+      const updatedRow = result.rows[0];
+
+      if (status === ORDER_STATUS.APPROVED) {
+        await sendTelegramMessage(updatedRow.date, APPROVED_ORDERS_CHANNEL_ID);
+      }
+
+      res.status(200).json(updatedRow);
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -250,7 +277,7 @@ const OrderController = () => {
         price_original,
       } = req.body;
 
-      console.log(id)
+      console.log(id);
 
       await client.connect();
 
