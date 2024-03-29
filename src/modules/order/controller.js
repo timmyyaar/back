@@ -75,6 +75,7 @@ const OrderController = () => {
         mainServicePriceOriginal,
         secondServicePriceOriginal,
         priceOriginal,
+        additionalInformation,
       } = req.body;
 
       if (name && number && email && address && date) {
@@ -91,16 +92,22 @@ const OrderController = () => {
           }
         }
 
+        const isOrderWithPhoneExists = await client.query(
+          'SELECT * FROM "order" WHERE (number = $1)',
+          [number]
+        );
+        const isNewClient = isOrderWithPhoneExists.rowCount === 0;
+
         if (secTitle) {
           const result = await client.query(
             `INSERT INTO "order" 
               (name, number, email, address, date, onlinePayment, 
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
-              price_original, total_service_price_original) 
+              price_original, total_service_price_original, additional_information, is_new_client) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $15, 
-              $16, $17, $18, $19, $21, $22) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24) RETURNING *`,
             [
               name,
               number,
@@ -124,6 +131,8 @@ const OrderController = () => {
               mainServicePriceOriginal,
               secondServicePriceOriginal,
               priceOriginal,
+              additionalInformation,
+              isNewClient,
             ]
           );
 
@@ -136,9 +145,9 @@ const OrderController = () => {
              (name, number, email, address, date, onlinePayment, 
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
-             price_original, total_service_price_original) 
+             price_original, total_service_price_original, additional_information, is_new_client) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
             [
               name,
               number,
@@ -157,6 +166,8 @@ const OrderController = () => {
               price,
               mainServicePriceOriginal,
               priceOriginal,
+              additionalInformation,
+              isNewClient,
             ]
           );
 
