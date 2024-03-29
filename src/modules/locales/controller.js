@@ -39,25 +39,26 @@ const LocalesController = () => {
     }
 
     try {
-      const { key, value, locale } = req.body;
+      const { key, english, polish, russian, ukrainian } = req.body;
 
-      if (key && value && locale) {
+      if (key && english && polish && russian && ukrainian) {
         await client.connect();
 
         const localeExists = await client.query(
-          "SELECT * FROM locales WHERE key = $1 AND locale = $2",
-          [key, locale]
+          "SELECT * FROM locales WHERE key = $1",
+          [key]
         );
 
         if (localeExists.rowCount > 0) {
           res.status(409).json({ message: "Locale already exists" });
         } else {
           const result = await client.query(
-            "INSERT INTO locales (key, value, locale) VALUES ($1, $2, $3) RETURNING *",
-            [key, value, locale]
+            `INSERT INTO locales (key, value, locale) VALUES ($1, $2, $6), 
+             ($1, $3, $7), ($1, $4, $8), ($1, $5, $9) RETURNING *`,
+            [key, english, polish, russian, ukrainian, "en", "pl", "ru", "uk"]
           );
 
-          res.status(200).json({ locale: result.rows[0] });
+          res.status(200).json(result.rows);
         }
       } else {
         res.status(422).json({ message: "Unprocessable Entity" });
@@ -119,12 +120,12 @@ const LocalesController = () => {
     }
 
     try {
-      const { key, value, locale } = req.body;
+      const { key } = req.body;
 
       await client.connect();
       const result = await client.query(
-        "DELETE FROM locales WHERE key = $1 AND value = $2 AND locale = $3 RETURNING *",
-        [key, value, locale]
+        "DELETE FROM locales WHERE key = $1 RETURNING *",
+        [key]
       );
 
       res
