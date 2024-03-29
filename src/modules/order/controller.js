@@ -76,9 +76,11 @@ const OrderController = () => {
         secondServicePriceOriginal,
         priceOriginal,
         additionalInformation,
+        city,
+        transportationPrice,
       } = req.body;
 
-      if (name && number && email && address && date) {
+      if (name && number && email && address && date && city) {
         await client.connect();
 
         if (promo) {
@@ -104,10 +106,11 @@ const OrderController = () => {
               (name, number, email, address, date, onlinePayment, 
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
-              price_original, total_service_price_original, additional_information, is_new_client) 
+              price_original, total_service_price_original, additional_information, 
+              is_new_client, city, transportation_price) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26) RETURNING *`,
             [
               name,
               number,
@@ -133,6 +136,8 @@ const OrderController = () => {
               priceOriginal,
               additionalInformation,
               isNewClient,
+              city,
+              transportationPrice,
             ]
           );
 
@@ -145,9 +150,10 @@ const OrderController = () => {
              (name, number, email, address, date, onlinePayment, 
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
-             price_original, total_service_price_original, additional_information, is_new_client) 
+             price_original, total_service_price_original, additional_information, 
+             is_new_client, city, transportation_price) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
             [
               name,
               number,
@@ -168,6 +174,8 @@ const OrderController = () => {
               priceOriginal,
               additionalInformation,
               isNewClient,
+              city,
+              transportationPrice,
             ]
           );
 
