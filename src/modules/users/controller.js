@@ -142,7 +142,13 @@ const UsersController = () => {
     }
 
     try {
-      const { email, password, role } = req.body;
+      const {
+        email,
+        password,
+        role,
+        haveVacuumCleaner = false,
+        haveCar = false,
+      } = req.body;
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -165,8 +171,8 @@ const UsersController = () => {
       }
 
       const result = await client.query(
-        "INSERT INTO users(email, password, role) VALUES($1, $2, $3) RETURNING *",
-        [email, hashedPassword, role]
+        "INSERT INTO users(email, password, role, have_vacuum_cleaner, have_car) VALUES($1, $2, $3, $4, $5) RETURNING *",
+        [email, hashedPassword, role, haveVacuumCleaner, haveCar]
       );
 
       res.status(200).json(result.rows[0]);
@@ -211,6 +217,35 @@ const UsersController = () => {
 
       res.status(200).json(result.rows[0]);
     } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
+  const updateUserDetails = async (req, res) => {
+    const client = getClient();
+
+    if (req.role !== constants.ROLES.ADMIN) {
+      return res
+        .status(403)
+        .json({ message: "You don't have access to this!" });
+    }
+
+    try {
+      const { haveVacuumCleaner, haveCar } = req.body;
+      const id = req.params.id;
+
+      await client.connect();
+
+      const result = await client.query(
+        "UPDATE users SET have_vacuum_cleaner = $2, have_car = $3 WHERE id = $1 RETURNING *",
+        [id, haveVacuumCleaner, haveCar]
+      );
+
+      res.status(200).json(result.rows[0]);
+    } catch (error) {
+      console.log(error);
       res.status(500).json({ error });
     } finally {
       await client.end();
@@ -286,6 +321,7 @@ const UsersController = () => {
     updateUserRole,
     changePassword,
     deleteUser,
+    updateUserDetails,
   };
 };
 

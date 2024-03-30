@@ -16,6 +16,11 @@ usersRouter
     verifyToken,
     usersController.changePassword
   )
+  .patch(
+    "/users/:id/update-details",
+    verifyToken,
+    usersController.updateUserDetails
+  )
   .delete("/users/:id", verifyToken, usersController.deleteUser);
 
 module.exports = usersRouter;
