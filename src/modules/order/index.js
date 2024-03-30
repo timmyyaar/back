@@ -11,7 +11,8 @@ orderRouter
   .post("/order", orderController.createOrder)
   .put("/order/:id", verifyToken, orderController.updateOrder)
   .delete("/order/:id", verifyToken, orderController.deleteOrder)
-  .patch("/order/:id/:cleanerId", verifyToken, orderController.assignOrder)
+  .patch("/order/:id/assign", verifyToken, orderController.assignOrder)
+  .patch("/order/:id/:cleanerId", verifyToken, orderController.assignOnMe)
   .patch(
     "/order/:id/update-status/:status",
     verifyToken,
