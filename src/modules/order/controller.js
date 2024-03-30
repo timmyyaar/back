@@ -40,7 +40,13 @@ const OrderController = () => {
         'SELECT * FROM "order" ORDER BY id DESC'
       );
 
-      res.json(result.rows);
+      res.json(
+        result.rows.map((item) => {
+          const cleaner_id = item.cleaner_id ? item.cleaner_id.split(",") : [];
+
+          return { ...item, cleaner_id: cleaner_id.map((item) => +item) };
+        })
+      );
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -63,7 +69,6 @@ const OrderController = () => {
         personalData = false,
         price = "",
         promo = "",
-        estimate = "",
         title = "",
         counter = "",
         subService = "",
@@ -78,6 +83,10 @@ const OrderController = () => {
         additionalInformation,
         city,
         transportationPrice,
+        mainServiceEstimate,
+        mainServiceCleanersCount,
+        secondServiceEstimate,
+        secondServiceCleanersCount,
       } = req.body;
 
       if (name && number && email && address && date && city) {
@@ -107,10 +116,10 @@ const OrderController = () => {
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
-              is_new_client, city, transportation_price) 
+              is_new_client, city, transportation_price, cleaners_count) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29) RETURNING *`,
             [
               name,
               number,
@@ -121,7 +130,7 @@ const OrderController = () => {
               requestPreviousCleaner,
               personalData,
               promo,
-              estimate,
+              mainServiceEstimate,
               title,
               counter,
               subService,
@@ -138,6 +147,9 @@ const OrderController = () => {
               isNewClient,
               city,
               transportationPrice,
+              mainServiceCleanersCount,
+              secondServiceEstimate,
+              secondServiceCleanersCount,
             ]
           );
 
@@ -151,9 +163,9 @@ const OrderController = () => {
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
-             is_new_client, city, transportation_price) 
+             is_new_client, city, transportation_price, cleaners_count) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING *`,
             [
               name,
               number,
@@ -165,7 +177,7 @@ const OrderController = () => {
               personalData,
               mainServicePrice,
               promo,
-              estimate,
+              mainServiceEstimate,
               title,
               counter,
               subService,
@@ -176,6 +188,7 @@ const OrderController = () => {
               isNewClient,
               city,
               transportationPrice,
+              mainServiceCleanersCount,
             ]
           );
 
@@ -216,8 +229,35 @@ const OrderController = () => {
 
     try {
       const id = req.params.id;
-      const cleanerId = req.params.cleanerId;
+      const { cleanerId = [] } = req.body;
       const role = req.role;
+
+      await client.connect();
+
+      const result = await client.query(
+        'UPDATE "order" SET cleaner_id = $2, status = $3 WHERE id = $1 RETURNING *',
+        [id, cleanerId.join(","), cleanerId.length > 0 ? "approved" : "created"]
+      );
+      const updatedOrder = result.rows[0];
+      const cleaner_id = updatedOrder.cleaner_id
+        ? updatedOrder.cleaner_id.split(",")
+        : [];
+
+      res
+        .status(200)
+        .json({ ...updatedOrder, cleaner_id: cleaner_id.map((item) => +item) });
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
+  const assignOnMe = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const { id, cleanerId } = req.params;
 
       await client.connect();
 
@@ -226,19 +266,35 @@ const OrderController = () => {
         [id]
       );
       const existingOrder = orderQuery.rows[0];
+      const existingCleanerId = existingOrder.cleaner_id
+        ? existingOrder.cleaner_id.split(",")
+        : [];
 
-      if (existingOrder.cleaner_id && role !== ROLES.ADMIN) {
+      if (existingCleanerId.length >= existingOrder.cleaners_count) {
         return res
           .status(422)
           .json({ message: "Oops, someone has already taken your order!" });
       }
 
-      const result = await client.query(
-        'UPDATE "order" SET cleaner_id = $2, status = $3 WHERE id = $1 RETURNING *',
-        [id, cleanerId || null, +cleanerId ? "approved" : "created"]
-      );
+      if (existingCleanerId.includes(+cleanerId)) {
+        return res
+          .status(422)
+          .json({ message: "You already assigned to this order!" });
+      }
 
-      res.status(200).json(result.rows[0]);
+      const result = await client.query(
+        'UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *',
+        [id, [...existingCleanerId, cleanerId].join(",")]
+      );
+      const updatedOrder = result.rows[0];
+      const updatedOrderCleanerId = updatedOrder.cleaner_id
+        ? updatedOrder.cleaner_id.split(",")
+        : [];
+
+      res.status(200).json({
+        ...updatedOrder,
+        cleaner_id: updatedOrderCleanerId.map((item) => +item),
+      });
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -260,13 +316,20 @@ const OrderController = () => {
         [id, status]
       );
 
-      const updatedRow = result.rows[0];
+      const updatedOrder = result.rows[0];
 
       if (status === ORDER_STATUS.APPROVED) {
         //await sendTelegramMessage(updatedRow.date, APPROVED_ORDERS_CHANNEL_ID);
       }
 
-      res.status(200).json(updatedRow);
+      const updatedOrderCleanerId = updatedOrder.cleaner_id
+        ? updatedOrder.cleaner_id.split(",")
+        : [];
+
+      res.status(200).json({
+        ...updatedOrder,
+        cleaner_id: updatedOrderCleanerId.map((item) => +item),
+      });
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -296,15 +359,7 @@ const OrderController = () => {
         price_original,
       } = req.body;
 
-      console.log(id);
-
       await client.connect();
-
-      const existingOrder = await client.query(
-        'SELECT * FROM "order" WHERE id = $1',
-        [id]
-      );
-      console.log(existingOrder.rows);
 
       const result = await client.query(
         `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
@@ -330,7 +385,15 @@ const OrderController = () => {
         ]
       );
 
-      res.status(200).json(result.rows[0]);
+      const updatedOrder = result.rows[0];
+      const updatedOrderCleanerId = updatedOrder.cleaner_id
+        ? updatedOrder.cleaner_id.split(",")
+        : [];
+
+      res.status(200).json({
+        ...updatedOrder,
+        cleaner_id: updatedOrderCleanerId.map((item) => +item),
+      });
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -345,6 +408,7 @@ const OrderController = () => {
     assignOrder,
     updateOrderStatus,
     updateOrder,
+    assignOnMe,
   };
 };
 
