@@ -80,28 +80,38 @@ const LocalesController = () => {
     }
 
     try {
-      const { key, value, locale } = req.body;
+      const { key, english, russian, polish, ukrainian } = req.body;
 
-      if (key && value && locale) {
+      if (key && english && russian && polish && ukrainian) {
         await client.connect();
 
-        const localeExists = await client.query(
-          "SELECT * FROM locales WHERE key = $1 AND locale = $2",
-          [key, locale]
+        const resultEnglish = await client.query(
+          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
+          [key, english, "en"]
+        );
+        const resultPolish = await client.query(
+          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
+          [key, polish, "pl"]
+        );
+        const resultRussian = await client.query(
+          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
+          [key, russian, "ru"]
+        );
+        const resultUkrainian = await client.query(
+          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
+          [key, ukrainian, "uk"]
         );
 
-        if (localeExists.rowCount === 0) {
-          res.status(404).json({ message: "Locale not found" });
-        } else {
-          const result = await client.query(
-            "UPDATE locales SET value = $1 WHERE key = $2 AND locale = $3 RETURNING *",
-            [value, key, locale]
-          );
-
-          res.status(200).json({ locale: result.rows[0] });
-        }
+        res
+          .status(200)
+          .json([
+            resultEnglish.rows[0],
+            resultPolish.rows[0],
+            resultRussian.rows[0],
+            resultUkrainian.rows[0],
+          ]);
       } else {
-        res.status(422).json({ message: "Unprocessable Entity" });
+        res.status(422).json({ message: "Not all valid fields are filled!" });
       }
     } catch (error) {
       res.status(500).json({ error });
