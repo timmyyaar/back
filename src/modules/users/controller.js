@@ -9,6 +9,33 @@ const env = require("../../helpers/environments");
 
 const AUTH_COOKIE_EXPIRATION_TIME = 7 * 24 * 60 * 60 * 1000;
 
+const getUpdatedUserRating = (currentRating = "", rating) => {
+  if (currentRating.length < 20) {
+    return `${currentRating}${rating}`;
+  }
+
+  const currentRatingArray = currentRating.split("");
+
+  currentRatingArray.shift();
+
+  return [...currentRatingArray, `${rating}`].join().replaceAll(",", "");
+};
+
+const getUserWithRating = (user) => {
+  const rating = user.rating?.split("");
+
+  return {
+    ...user,
+    rating: rating
+      ? Number(
+          (
+            rating.reduce((result, item) => result + +item, 0) / rating.length
+          ).toFixed(1)
+        )
+      : 5,
+  };
+};
+
 const UsersController = () => {
   const getClient = () => {
     const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
@@ -124,7 +151,25 @@ const UsersController = () => {
       await client.connect();
       const result = await client.query("SELECT * FROM users ORDER BY id ASC");
 
-      res.json(result.rows);
+      res.json(result.rows.map(getUserWithRating));
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
+  const getMyUser = async (req, res) => {
+    const client = getClient();
+
+    try {
+      await client.connect();
+      const result = await client.query("SELECT * FROM users WHERE id = $1", [
+        req.userId,
+      ]);
+      const user = getUserWithRating(result.rows[0]);
+
+      res.json({ id: user.id, email: user.email, rating: user.rating });
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -175,7 +220,7 @@ const UsersController = () => {
         [email, hashedPassword, role, haveVacuumCleaner, haveCar]
       );
 
-      res.status(200).json(result.rows[0]);
+      res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -215,7 +260,7 @@ const UsersController = () => {
         [id, role]
       );
 
-      res.status(200).json(result.rows[0]);
+      res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -243,9 +288,8 @@ const UsersController = () => {
         [id, haveVacuumCleaner, haveCar]
       );
 
-      res.status(200).json(result.rows[0]);
+      res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
-      console.log(error);
       res.status(500).json({ error });
     } finally {
       await client.end();
@@ -274,7 +318,7 @@ const UsersController = () => {
         [id, hashedPassword]
       );
 
-      res.status(200).json(result.rows[0]);
+      res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -305,7 +349,43 @@ const UsersController = () => {
         [id]
       );
 
-      res.status(200).json(result.rows[0]);
+      res.status(200).json(getUserWithRating(result.rows[0]));
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
+  const updateUserRating = async (req, res) => {
+    const client = getClient();
+
+    if (req.role !== constants.ROLES.ADMIN) {
+      return res
+        .status(403)
+        .json({ message: "You don't have access to this!" });
+    }
+
+    try {
+      const { rating } = req.body;
+      const id = req.params.id;
+
+      await client.connect();
+
+      const userQuery = await client.query(
+        "SELECT * FROM users WHERE id = $1",
+        [id]
+      );
+      const existingUser = userQuery.rows[0];
+      const currentUserRating = existingUser.rating || "";
+      const updatedRating = getUpdatedUserRating(currentUserRating, rating);
+
+      const result = await client.query(
+        "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
+        [id, updatedRating]
+      );
+
+      res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
     } finally {
@@ -317,11 +397,13 @@ const UsersController = () => {
     signUp,
     login,
     getUsers,
+    getMyUser,
     createUser,
     updateUserRole,
     changePassword,
     deleteUser,
     updateUserDetails,
+    updateUserRating,
   };
 };
 
