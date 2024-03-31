@@ -1,22 +1,24 @@
 const { Client } = require("pg");
 
-const {
-  ROLES,
-  CREATED_ORDERS_CHANNEL_ID,
-  APPROVED_ORDERS_CHANNEL_ID,
-  ORDER_STATUS,
-} = require("../../constants");
-
 const env = require("../../helpers/environments");
+const {
+  CREATED_ORDERS_CHANNEL_ID,
+  APPROVED_DRY_OZONATION_CHANNEL_ID,
+  APPROVED_REGULAR_CHANNEL_ID,
+  ORDER_TITLES,
+  ORDER_STATUS,
+} = require("./constants");
 
-const sendTelegramMessage = async (date, channel) => {
+const sendTelegramMessage = async (date, channel, title) => {
   await fetch(
     `https://api.telegram.org/bot${env.getEnvironment(
       "TELEGRAM_BOT_ID"
     )}/sendMessage?` +
       new URLSearchParams({
         chat_id: channel,
-        text: `New order!\n${date.replaceAll("/", ".").replace(" ", ", ")}`,
+        text: `New ${title ? `${title} ` : ""}order!\n${date
+          .replaceAll("/", ".")
+          .replace(" ", ", ")}`,
       })
   );
 };
@@ -319,7 +321,18 @@ const OrderController = () => {
       const updatedOrder = result.rows[0];
 
       if (status === ORDER_STATUS.APPROVED) {
-        //await sendTelegramMessage(updatedRow.date, APPROVED_ORDERS_CHANNEL_ID);
+        const isDryOrOzonation = [
+          ORDER_TITLES.DRY_CLEANING,
+          ORDER_TITLES.OZONATION,
+        ].includes(updatedOrder.title);
+
+        await sendTelegramMessage(
+          updatedOrder.date,
+          isDryOrOzonation
+            ? APPROVED_DRY_OZONATION_CHANNEL_ID
+            : APPROVED_REGULAR_CHANNEL_ID,
+          updatedOrder.title
+        );
       }
 
       const updatedOrderCleanerId = updatedOrder.cleaner_id
