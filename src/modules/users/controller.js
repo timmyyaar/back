@@ -2,24 +2,13 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const constants = require("../../constants");
+const { getUpdatedUserRating } = require("../../utils");
 
 const { Client } = require("pg");
 
 const env = require("../../helpers/environments");
 
 const AUTH_COOKIE_EXPIRATION_TIME = 7 * 24 * 60 * 60 * 1000;
-
-const getUpdatedUserRating = (currentRating = "", rating) => {
-  if (currentRating.length < 20) {
-    return `${currentRating}${rating}`;
-  }
-
-  const currentRatingArray = currentRating.split("");
-
-  currentRatingArray.shift();
-
-  return [...currentRatingArray, `${rating}`].join().replaceAll(",", "");
-};
 
 const getUserWithRating = (user) => {
   const rating = user.rating?.split("");

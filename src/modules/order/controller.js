@@ -1,12 +1,27 @@
 const { Client } = require("pg");
+const nodemailer = require("nodemailer");
+
+const { getUpdatedUserRating } = require("../../utils");
+const { getEmailHtmlTemplate } = require("./emailHtmlTemplate");
 
 const env = require("../../helpers/environments");
+
+const transporter = nodemailer.createTransport({
+  service: "Gmail",
+  secure: true,
+  auth: {
+    user: "tytfeedback@gmail.com",
+    pass: env.getEnvironment("EMAIL_APP_PASSWORD"),
+  },
+});
+
 const {
   CREATED_ORDERS_CHANNEL_ID,
   APPROVED_DRY_OZONATION_CHANNEL_ID,
   APPROVED_REGULAR_CHANNEL_ID,
   ORDER_TITLES,
   ORDER_STATUS,
+  emailSubjectTranslation,
 } = require("./constants");
 
 const sendTelegramMessage = async (date, channel, title) => {
@@ -56,6 +71,34 @@ const OrderController = () => {
     }
   };
 
+  const getClientOrder = async (req, res) => {
+    const client = getClient();
+
+    const { ids } = req.query;
+
+    const idsArray = ids.split(",").map((item) => +item);
+
+    try {
+      await client.connect();
+      const result = await client.query(
+        'SELECT * FROM "order" WHERE id = ANY($1::int[])',
+        [idsArray]
+      );
+
+      res.json(
+        result.rows.map((item) => {
+          const cleaner_id = item.cleaner_id ? item.cleaner_id.split(",") : [];
+
+          return { ...item, cleaner_id: cleaner_id.map((item) => +item) };
+        })
+      );
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
   const createOrder = async (req, res) => {
     const client = getClient();
 
@@ -89,6 +132,7 @@ const OrderController = () => {
         mainServiceCleanersCount,
         secondServiceEstimate,
         secondServiceCleanersCount,
+        language,
       } = req.body;
 
       if (name && number && email && address && date && city) {
@@ -118,10 +162,10 @@ const OrderController = () => {
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
-              is_new_client, city, transportation_price, cleaners_count) 
+              is_new_client, city, transportation_price, cleaners_count, language) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30) RETURNING *`,
             [
               name,
               number,
@@ -152,6 +196,7 @@ const OrderController = () => {
               mainServiceCleanersCount,
               secondServiceEstimate,
               secondServiceCleanersCount,
+              language,
             ]
           );
 
@@ -165,9 +210,9 @@ const OrderController = () => {
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
-             is_new_client, city, transportation_price, cleaners_count) 
+             is_new_client, city, transportation_price, cleaners_count, language) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
             [
               name,
               number,
@@ -191,6 +236,7 @@ const OrderController = () => {
               city,
               transportationPrice,
               mainServiceCleanersCount,
+              language,
             ]
           );
 
@@ -313,10 +359,49 @@ const OrderController = () => {
 
       await client.connect();
 
-      const result = await client.query(
-        'UPDATE "order" SET status = $2 WHERE id = $1 RETURNING *',
-        [id, status]
+      const existingOrderQuery = await client.query(
+        'SELECT * FROM "order" WHERE (id = $1)',
+        [id]
       );
+      const existingOrder = existingOrderQuery.rows[0];
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const connectedOrderQuery = await client.query(
+        'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
+        [id, existingOrder.date, existingOrder.number, existingOrder.address]
+      );
+      const connectedOrder = connectedOrderQuery.rows[0];
+
+      const feedBackLinkId = connectedOrder
+        ? [
+            { id: existingOrder.id, title: existingOrder.title },
+            { id: connectedOrder.id, title: connectedOrder.title },
+          ]
+        : [{ id: existingOrder.id, title: existingOrder.title }];
+      const base64Orders = Buffer.from(JSON.stringify(feedBackLinkId)).toString(
+        "base64"
+      );
+
+      const result = await client.query(
+        'UPDATE "order" SET status = $2, feedback_link_id = $3 WHERE id = $1 RETURNING *',
+        [
+          id,
+          status,
+          status === ORDER_STATUS.IN_PROGRESS
+            ? base64Orders
+            : existingOrder.feedback_link_id,
+        ]
+      );
+
+      if (connectedOrder && status === ORDER_STATUS.IN_PROGRESS) {
+        await client.query(
+          'UPDATE "order" SET feedback_link_id = $2 WHERE id = $1 RETURNING *',
+          [connectedOrder.id, base64Orders]
+        );
+      }
 
       const updatedOrder = result.rows[0];
 
@@ -333,6 +418,27 @@ const OrderController = () => {
             : APPROVED_REGULAR_CHANNEL_ID,
           updatedOrder.title
         );
+      }
+
+      if (status === ORDER_STATUS.DONE && updatedOrder.feedback_link_id) {
+        await transporter.sendMail({
+          from: "tytfeedback@gmail.com",
+          to: updatedOrder.email,
+          subject: emailSubjectTranslation[updatedOrder.language],
+          html: getEmailHtmlTemplate(updatedOrder),
+          attachments: [
+            {
+              filename: "logo.png",
+              path: __dirname + "/images/logo.png",
+              cid: "logo@nodemailer.com",
+            },
+            {
+              filename: "bubbles.png",
+              path: __dirname + "/images/bubbles.png",
+              cid: "bubbles@nodemailer.com",
+            },
+          ],
+        });
       }
 
       const updatedOrderCleanerId = updatedOrder.cleaner_id
@@ -414,14 +520,85 @@ const OrderController = () => {
     }
   };
 
+  const sendFeedback = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const id = req.params.id;
+      const { feedback, rating } = req.body;
+
+      await client.connect();
+
+      const existingOrder = await client.query(
+        `SELECT * FROM "order" WHERE id = $1`,
+        [id]
+      );
+
+      if (!existingOrder.rows[0].feedback) {
+        const orderQuery = await client.query(
+          `UPDATE "order" SET feedback = $2, rating = $3 WHERE id = $1 RETURNING *`,
+          [id, feedback, rating]
+        );
+
+        const updatedOrder = orderQuery.rows[0];
+
+        const cleanerIds = updatedOrder.cleaner_id
+          ? updatedOrder.cleaner_id.split(",")
+          : [];
+
+        await Promise.all(
+          cleanerIds.map(async (id) => {
+            const userQuery = await client.query(
+              "SELECT * FROM users WHERE id = $1",
+              [id]
+            );
+            const user = userQuery.rows[0];
+
+            if (user) {
+              const currentUserRating = user.rating || "";
+              const updatedRating = getUpdatedUserRating(
+                currentUserRating,
+                rating
+              );
+
+              return await client.query(
+                "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
+                [id, updatedRating]
+              );
+            } else {
+              return await Promise.resolve();
+            }
+          })
+        );
+
+        const updatedOrderCleanerId = updatedOrder.cleaner_id
+          ? updatedOrder.cleaner_id.split(",")
+          : [];
+
+        res.status(200).json({
+          ...updatedOrder,
+          cleaner_id: updatedOrderCleanerId.map((item) => +item),
+        });
+      } else {
+        res.status(409).json({ message: "Feedback was already sent" });
+      }
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
   return {
     getOrder,
+    getClientOrder,
     createOrder,
     deleteOrder,
     assignOrder,
     updateOrderStatus,
     updateOrder,
     assignOnMe,
+    sendFeedback,
   };
 };
 

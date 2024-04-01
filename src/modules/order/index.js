@@ -7,8 +7,10 @@ const orderController = require("./controller");
 const orderRouter = new Router();
 
 orderRouter
-  .get("/order", verifyToken, orderController.getOrder)
   .post("/order", orderController.createOrder)
+  .patch("/order/:id/send-feedback", orderController.sendFeedback)
+  .get("/order/client-order", orderController.getClientOrder)
+  .get("/order", verifyToken, orderController.getOrder)
   .put("/order/:id", verifyToken, orderController.updateOrder)
   .delete("/order/:id", verifyToken, orderController.deleteOrder)
   .patch("/order/:id/assign", verifyToken, orderController.assignOrder)
