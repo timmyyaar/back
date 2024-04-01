@@ -62,7 +62,7 @@ const getEmailHtmlTemplate = (updatedOrder) => {
                         <p>${t.express_gratitude}</p>
                         <p>${t.spare_moments}</p>
                         <p><span style="font-weight: 600;">${t.click_link_google}</span> <a href="https://g.page/r/CW4tBwhrljwjEBI/review" target="_blank">https://g.page/r/CW4tBwhrljwjEBI/review </a></p>
-                        <p><span style="font-weight: 600;">${t.review_cleaners}</span> <a href="https://www.takeutime.pl/order/feedback?orders=${updatedOrder.feedback_link_id}" target="_blank">https://www.takeutime.pl/order/feedback?orders=${updatedOrder.feedback_link_id}</a></p>
+                        <p><span style="font-weight: 600;">${t.review_cleaners}</span> <a href="https://www.takeutime.pl/feedback?orders=${updatedOrder.feedback_link_id}" target="_blank">https://www.takeutime.pl/order/feedback?orders=${updatedOrder.feedback_link_id}</a></p>
                         <p>${t.thank_you_again}</p>
                         <p>${t.warm_regards}</p>
                         <div style="margin-top: 36px">
