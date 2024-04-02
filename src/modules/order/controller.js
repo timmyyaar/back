@@ -420,7 +420,11 @@ const OrderController = () => {
         );
       }
 
-      if (status === ORDER_STATUS.DONE && updatedOrder.feedback_link_id) {
+      if (
+        status === ORDER_STATUS.DONE &&
+        updatedOrder.feedback_link_id &&
+        (!connectedOrder || connectedOrder.status === ORDER_STATUS.DONE)
+      ) {
         await transporter.sendMail({
           from: "tytfeedback@gmail.com",
           to: updatedOrder.email,
@@ -589,6 +593,51 @@ const OrderController = () => {
     }
   };
 
+  const refuseOrder = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const id = req.params.id;
+      const userId = req.userId;
+
+      await client.connect();
+
+      const existingOrderQuery = await client.query(
+        'SELECT * FROM "order" WHERE id = $1',
+        [id]
+      );
+      const existingOrder = existingOrderQuery.rows[0];
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const cleanerIds = existingOrder.cleaner_id.split(",");
+      const updatedCleanerIds = cleanerIds
+        .filter((cleanerId) => +cleanerId !== +userId)
+        .join(",");
+
+      const result = await client.query(
+        `UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *`,
+        [id, updatedCleanerIds]
+      );
+
+      const updatedOrder = result.rows[0];
+      const updatedOrderCleanerId = updatedOrder.cleaner_id
+        ? updatedOrder.cleaner_id.split(",")
+        : [];
+
+      res.status(200).json({
+        ...updatedOrder,
+        cleaner_id: updatedOrderCleanerId.map((item) => +item),
+      });
+    } catch (error) {
+      res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
   return {
     getOrder,
     getClientOrder,
@@ -599,6 +648,7 @@ const OrderController = () => {
     updateOrder,
     assignOnMe,
     sendFeedback,
+    refuseOrder,
   };
 };
 
