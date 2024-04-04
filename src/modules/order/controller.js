@@ -133,6 +133,7 @@ const OrderController = () => {
         secondServiceEstimate,
         secondServiceCleanersCount,
         language,
+        creationDate,
       } = req.body;
 
       if (name && number && email && address && date && city) {
@@ -162,10 +163,10 @@ const OrderController = () => {
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
-              is_new_client, city, transportation_price, cleaners_count, language) 
+              is_new_client, city, transportation_price, cleaners_count, language, creation_date) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31) RETURNING *`,
             [
               name,
               number,
@@ -197,6 +198,7 @@ const OrderController = () => {
               secondServiceEstimate,
               secondServiceCleanersCount,
               language,
+              creationDate,
             ]
           );
 
@@ -210,9 +212,9 @@ const OrderController = () => {
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
-             is_new_client, city, transportation_price, cleaners_count, language) 
+             is_new_client, city, transportation_price, cleaners_count, language, creation_date) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
             [
               name,
               number,
@@ -237,6 +239,7 @@ const OrderController = () => {
               transportationPrice,
               mainServiceCleanersCount,
               language,
+              creationDate,
             ]
           );
 
