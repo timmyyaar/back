@@ -150,11 +150,19 @@ const OrderController = () => {
           }
         }
 
-        const isOrderWithPhoneExists = await client.query(
-          'SELECT * FROM "order" WHERE (number = $1)',
-          [number]
+        const isClientExists = await client.query(
+          "SELECT * FROM clients WHERE (phone = $1 AND name = $2)",
+          [number, name]
         );
-        const isNewClient = isOrderWithPhoneExists.rowCount === 0;
+        const isNewClient = isClientExists.rowCount === 0;
+
+        if (isNewClient) {
+          await client.query(
+            `INSERT INTO clients (name, phone, email, address, first_order_creation_date, first_order_date)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [name, number, email, address, creationDate, date]
+          );
+        }
 
         if (secTitle) {
           const result = await client.query(
