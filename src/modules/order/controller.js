@@ -491,6 +491,7 @@ const OrderController = () => {
         total_service_price,
         total_service_price_original,
         price_original,
+        dateCreated,
       } = req.body;
 
       await client.connect();
@@ -499,7 +500,7 @@ const OrderController = () => {
         `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
                date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
                counter = $11, subService = $12, total_service_price = $13,
-               total_service_price_original = $14, price_original = $15 WHERE id = $1 RETURNING *`,
+               total_service_price_original = $14, price_original = $15, creation_date = $16 WHERE id = $1 RETURNING *`,
         [
           id,
           name,
@@ -516,6 +517,7 @@ const OrderController = () => {
           total_service_price,
           total_service_price_original,
           price_original,
+          dateCreated,
         ]
       );
 
