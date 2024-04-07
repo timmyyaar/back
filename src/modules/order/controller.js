@@ -6,6 +6,8 @@ const { getEmailHtmlTemplate } = require("./emailHtmlTemplate");
 
 const env = require("../../helpers/environments");
 
+const VACUUM_CLEANER_SUB_SERVICE = "Vacuum_cleaner_sub_service_summery";
+
 const transporter = nodemailer.createTransport({
   service: "Gmail",
   secure: true,
@@ -324,10 +326,36 @@ const OrderController = () => {
         'SELECT * FROM "order" WHERE id = $1',
         [id]
       );
+
       const existingOrder = orderQuery.rows[0];
       const existingCleanerId = existingOrder.cleaner_id
         ? existingOrder.cleaner_id.split(",")
         : [];
+
+      const cleanersQuery = await client.query(
+        "SELECT * FROM users WHERE id = ANY($1::int[])",
+        [existingCleanerId]
+      );
+      const assignedCleaners = cleanersQuery.rows;
+
+      const currentCleanerQuery = await client.query(
+        "SELECT * FROM users WHERE id = $1",
+        [cleanerId]
+      );
+      const currentCleaner = currentCleanerQuery.rows[0];
+
+      if (
+        existingOrder.subservice.includes(VACUUM_CLEANER_SUB_SERVICE) &&
+        existingOrder.cleaners_count - existingCleanerId.length === 1 &&
+        !assignedCleaners.some(
+          ({ have_vacuum_cleaner }) => have_vacuum_cleaner
+        ) &&
+        !currentCleaner.have_vacuum_cleaner
+      ) {
+        return res
+          .status(409)
+          .json({ message: "This order requires a vacuum cleaner!" });
+      }
 
       if (existingCleanerId.length >= existingOrder.cleaners_count) {
         return res
