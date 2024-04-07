@@ -320,6 +320,10 @@ const OrderController = () => {
     try {
       const { id, cleanerId } = req.params;
 
+      if (!cleanerId || !id) {
+        return res.status(404).json({ message: "Not found" });
+      }
+
       await client.connect();
 
       const orderQuery = await client.query(
