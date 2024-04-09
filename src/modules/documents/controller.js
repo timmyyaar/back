@@ -44,13 +44,14 @@ const DocumentsController = () => {
             type: file.mimetype,
           }),
           {
+            token: env.getEnvironment("BLOB_TOKEN_DOCUMENTS"),
             access: "public",
           }
         );
 
         if (existingDocument) {
           await del(existingDocument.link, {
-            access: "public",
+            token: env.getEnvironment("BLOB_TOKEN_DOCUMENTS"),
           });
 
           await client.query(
@@ -69,7 +70,7 @@ const DocumentsController = () => {
           );
         }
 
-        client.end()
+        client.end();
 
         return res.status(200).json({
           url: uploadedDocument.url,
@@ -78,7 +79,7 @@ const DocumentsController = () => {
         });
       });
     } catch (error) {
-      client.end()
+      client.end();
 
       return res.status(500).json({ error });
     }
@@ -97,7 +98,7 @@ const DocumentsController = () => {
     try {
       await client.connect();
       await del(url, {
-        access: "public",
+        token: env.getEnvironment("BLOB_TOKEN_DOCUMENTS"),
       });
 
       await client.query(

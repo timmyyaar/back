@@ -58,7 +58,7 @@ const ScheduleController = () => {
   const addSchedule = async (req, res) => {
     const client = getClient();
 
-    const employeeId = req.userId;
+    const employeeId = req.params.id || req.userId;
 
     const {
       date = null,
