@@ -11,6 +11,7 @@ const discountsRouter = require("../modules/discounts");
 const documentsRouter = require("../modules/documents");
 const clientsRouter = require("../modules/clients");
 const scheduleRouter = require("../modules/schedule");
+const blogsRouter = require("../modules/blogs");
 
 const tasksRouter = require("../modules/tasks");
 
@@ -28,6 +29,7 @@ router
   .use(discountsRouter)
   .use(documentsRouter)
   .use(clientsRouter)
-  .use(scheduleRouter);
+  .use(scheduleRouter)
+  .use(blogsRouter);
 
 module.exports = router;
