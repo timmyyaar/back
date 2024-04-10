@@ -18,7 +18,7 @@ const emailSubjectTranslation = {
   en: "Take Your Time, help us grow with a review",
   pl: "Take Your Time, pomóż nam się rozwijać - wystaw opinię",
   ru: "Take Your Time, помогите нам развиваться, оставив отзыв",
-  uk: "Take Your Time, допоможіть нам розвиватися, залишивши відгук",
+  ua: "Take Your Time, допоможіть нам розвиватися, залишивши відгук",
 };
 
 const emailTranslations = {
@@ -62,7 +62,7 @@ const emailTranslations = {
       "Спасибо вам еще раз за выбор наших услуг и за рассмотрение возможности поделиться вашими впечатлениями.",
     warm_regards: "С наилучшими пожеланиями, Take Your Time",
   },
-  uk: {
+  ua: {
     dear_client: "Шановн(а/ий)",
     hope_email: "Сподіваюся, ви читаєте цього листа в гарному настрої.",
     express_gratitude:
