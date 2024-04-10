@@ -55,7 +55,7 @@ const LocalesController = () => {
           const result = await client.query(
             `INSERT INTO locales (key, value, locale) VALUES ($1, $2, $6), 
              ($1, $3, $7), ($1, $4, $8), ($1, $5, $9) RETURNING *`,
-            [key, english, polish, russian, ukrainian, "en", "pl", "ru", "uk"]
+            [key, english, polish, russian, ukrainian, "en", "pl", "ru", "ua"]
           );
 
           res.status(200).json(result.rows);
@@ -99,7 +99,7 @@ const LocalesController = () => {
         );
         const resultUkrainian = await client.query(
           "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, ukrainian, "uk"]
+          [key, ukrainian, "ua"]
         );
 
         res
