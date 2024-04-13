@@ -18,12 +18,20 @@ const BlogsController = () => {
   const getBlogs = async (req, res) => {
     const client = getClient();
 
+    const { id } = req.params;
+
     try {
       await client.connect();
 
-      const result = await client.query("SELECT * FROM blogs");
+      const result = id
+        ? await client.query("SELECT * FROM blogs WHERE id = $1", [id])
+        : await client.query("SELECT * FROM blogs");
 
-      return res.json(result.rows);
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "No blogs found" });
+      }
+
+      return res.json(id ? result.rows[0] : result.rows);
     } catch (error) {
       return res.status(500).json({ error });
     } finally {
