@@ -525,6 +525,7 @@ const OrderController = () => {
         price_original,
         dateCreated,
         note = null,
+        reward = null,
       } = req.body;
 
       await client.connect();
@@ -534,7 +535,7 @@ const OrderController = () => {
                date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
                counter = $11, subService = $12, total_service_price = $13,
                total_service_price_original = $14, price_original = $15, creation_date = $16,
-               note = $17 WHERE id = $1 RETURNING *`,
+               note = $17, reward = $18 WHERE id = $1 RETURNING *`,
         [
           id,
           name,
@@ -553,6 +554,7 @@ const OrderController = () => {
           price_original,
           dateCreated,
           note,
+          reward,
         ]
       );
 
