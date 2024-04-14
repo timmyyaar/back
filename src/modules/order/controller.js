@@ -6,6 +6,12 @@ const { getEmailHtmlTemplate } = require("./emailHtmlTemplate");
 
 const env = require("../../helpers/environments");
 
+const {
+  getSchedulePartsByOrder,
+  getUpdatedScheduleDetailsForEdit,
+  getUpdatedScheduleDetailsForDelete,
+} = require("./utils");
+
 const VACUUM_CLEANER_SUB_SERVICE = "Vacuum_cleaner_sub_service_summery";
 
 const transporter = nodemailer.createTransport({
@@ -291,14 +297,125 @@ const OrderController = () => {
     try {
       const id = req.params.id;
       const { cleanerId = [] } = req.body;
-      const role = req.role;
 
       await client.connect();
+
+      const existingOrderQuery = await client.query(
+        'SELECT * FROM "order" WHERE id = $1',
+        [id]
+      );
+      const existingOrder = existingOrderQuery.rows[0];
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
 
       const result = await client.query(
         'UPDATE "order" SET cleaner_id = $2, status = $3 WHERE id = $1 RETURNING *',
         [id, cleanerId.join(","), cleanerId.length > 0 ? "approved" : "created"]
       );
+
+      const existingOrderCleaners = existingOrder.cleaner_id
+        ? existingOrder.cleaner_id.split(",").map((item) => +item)
+        : [];
+      const cleanersDifferenceLength =
+        cleanerId.length - existingOrderCleaners.length;
+
+      if (cleanersDifferenceLength) {
+        const cleanersDifference = cleanerId
+          .filter((cleaner) => !existingOrderCleaners.includes(cleaner))
+          .concat(
+            existingOrderCleaners.filter(
+              (cleaner) => !cleanerId.includes(cleaner)
+            )
+          );
+
+        if (cleanersDifferenceLength > 0) {
+          await Promise.all(
+            cleanersDifference.map(async (cleaner) => {
+              const orderDateTime = existingOrder.date.split(" ");
+              const orderDate = orderDateTime[0];
+
+              const scheduleParts = getSchedulePartsByOrder(existingOrder);
+
+              const existingScheduleQuery = await client.query(
+                "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
+                [cleaner, orderDate]
+              );
+              const existingSchedule = existingScheduleQuery.rows[0];
+
+              if (existingSchedule) {
+                await client.query(
+                  `UPDATE schedule SET date = $2, first_period = $3,
+                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
+                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+                   WHERE id = $1 RETURNING *`,
+                  [
+                    existingSchedule.id,
+                    existingSchedule.date,
+                    ...getUpdatedScheduleDetailsForEdit(
+                      existingSchedule,
+                      scheduleParts
+                    ),
+                  ]
+                );
+              } else {
+                await client.query(
+                  `INSERT INTO schedule (employee_id, date, first_period, second_period,
+                third_period, fourth_period, first_period_additional,
+                second_period_additional, third_period_additional, fourth_period_additional)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+                  [
+                    cleaner,
+                    orderDate,
+                    scheduleParts.firstPeriod,
+                    scheduleParts.secondPeriod,
+                    scheduleParts.thirdPeriod,
+                    scheduleParts.fourthPeriod,
+                    scheduleParts.firstPeriodAdditional,
+                    scheduleParts.secondPeriodAdditional,
+                    scheduleParts.thirdPeriodAdditional,
+                    scheduleParts.fourthPeriodAdditional,
+                  ]
+                );
+              }
+            })
+          );
+        } else {
+          await Promise.all(
+            cleanersDifference.map(async (cleaner) => {
+              const orderDateTime = existingOrder.date.split(" ");
+              const orderDate = orderDateTime[0];
+
+              const scheduleParts = getSchedulePartsByOrder(existingOrder);
+
+              const existingScheduleQuery = await client.query(
+                "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
+                [cleaner, orderDate]
+              );
+              const existingSchedule = existingScheduleQuery.rows[0];
+
+              if (existingSchedule) {
+                await client.query(
+                  `UPDATE schedule SET date = $2, first_period = $3,
+                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
+                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+                   WHERE id = $1 RETURNING *`,
+                  [
+                    existingSchedule.id,
+                    existingSchedule.date,
+                    ...getUpdatedScheduleDetailsForDelete(
+                      existingSchedule,
+                      scheduleParts
+                    ),
+                  ]
+                );
+              }
+            })
+          );
+        }
+      }
+
       const updatedOrder = result.rows[0];
       const cleaner_id = updatedOrder.cleaner_id
         ? updatedOrder.cleaner_id.split(",")
@@ -332,6 +449,11 @@ const OrderController = () => {
       );
 
       const existingOrder = orderQuery.rows[0];
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
       const existingCleanerId = existingOrder.cleaner_id
         ? existingOrder.cleaner_id.split(",")
         : [];
@@ -381,6 +503,53 @@ const OrderController = () => {
       const updatedOrderCleanerId = updatedOrder.cleaner_id
         ? updatedOrder.cleaner_id.split(",")
         : [];
+
+      const orderDateTime = existingOrder.date.split(" ");
+      const orderDate = orderDateTime[0];
+
+      const scheduleParts = getSchedulePartsByOrder(existingOrder);
+
+      const existingScheduleQuery = await client.query(
+        "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
+        [cleanerId, orderDate]
+      );
+      const existingSchedule = existingScheduleQuery.rows[0];
+
+      if (existingSchedule) {
+        await client.query(
+          `UPDATE schedule SET date = $2, first_period = $3,
+           second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
+           second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+           WHERE id = $1 RETURNING *`,
+          [
+            existingSchedule.id,
+            existingSchedule.date,
+            ...getUpdatedScheduleDetailsForEdit(
+              existingSchedule,
+              scheduleParts
+            ),
+          ]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO schedule (employee_id, date, first_period, second_period,
+           third_period, fourth_period, first_period_additional,
+           second_period_additional, third_period_additional, fourth_period_additional)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          [
+            +cleanerId,
+            orderDate,
+            scheduleParts.firstPeriod,
+            scheduleParts.secondPeriod,
+            scheduleParts.thirdPeriod,
+            scheduleParts.fourthPeriod,
+            scheduleParts.firstPeriodAdditional,
+            scheduleParts.secondPeriodAdditional,
+            scheduleParts.thirdPeriodAdditional,
+            scheduleParts.fourthPeriodAdditional,
+          ]
+        );
+      }
 
       res.status(200).json({
         ...updatedOrder,
@@ -676,6 +845,34 @@ const OrderController = () => {
       const updatedOrderCleanerId = updatedOrder.cleaner_id
         ? updatedOrder.cleaner_id.split(",")
         : [];
+
+      const orderDateTime = existingOrder.date.split(" ");
+      const orderDate = orderDateTime[0];
+
+      const scheduleParts = getSchedulePartsByOrder(existingOrder);
+
+      const existingScheduleQuery = await client.query(
+        "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
+        [+userId, orderDate]
+      );
+      const existingSchedule = existingScheduleQuery.rows[0];
+
+      if (existingSchedule) {
+        await client.query(
+          `UPDATE schedule SET date = $2, first_period = $3,
+                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
+                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+                   WHERE id = $1 RETURNING *`,
+          [
+            existingSchedule.id,
+            existingSchedule.date,
+            ...getUpdatedScheduleDetailsForDelete(
+              existingSchedule,
+              scheduleParts
+            ),
+          ]
+        );
+      }
 
       res.status(200).json({
         ...updatedOrder,
