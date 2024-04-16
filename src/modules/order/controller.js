@@ -348,7 +348,9 @@ const OrderController = () => {
                 await client.query(
                   `UPDATE schedule SET date = $2, first_period = $3,
                    second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
+                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
+                   is_fourth_period_order = $14
                    WHERE id = $1 RETURNING *`,
                   [
                     existingSchedule.id,
@@ -357,14 +359,19 @@ const OrderController = () => {
                       existingSchedule,
                       scheduleParts
                     ),
+                    !scheduleParts.firstPeriod,
+                    !scheduleParts.secondPeriod,
+                    !scheduleParts.thirdPeriod,
+                    !scheduleParts.fourthPeriod,
                   ]
                 );
               } else {
                 await client.query(
                   `INSERT INTO schedule (employee_id, date, first_period, second_period,
                 third_period, fourth_period, first_period_additional,
-                second_period_additional, third_period_additional, fourth_period_additional)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+                second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
+                is_second_period_order, is_third_period_order, is_fourth_period_order)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
                   [
                     cleaner,
                     orderDate,
@@ -376,6 +383,10 @@ const OrderController = () => {
                     scheduleParts.secondPeriodAdditional,
                     scheduleParts.thirdPeriodAdditional,
                     scheduleParts.fourthPeriodAdditional,
+                    !scheduleParts.firstPeriod,
+                    !scheduleParts.secondPeriod,
+                    !scheduleParts.thirdPeriod,
+                    !scheduleParts.fourthPeriod,
                   ]
                 );
               }
@@ -399,7 +410,9 @@ const OrderController = () => {
                 await client.query(
                   `UPDATE schedule SET date = $2, first_period = $3,
                    second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
+                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
+                   is_fourth_period_order = $14
                    WHERE id = $1 RETURNING *`,
                   [
                     existingSchedule.id,
@@ -408,6 +421,18 @@ const OrderController = () => {
                       existingSchedule,
                       scheduleParts
                     ),
+                    scheduleParts.firstPeriod
+                      ? false
+                      : existingSchedule.is_first_period_order,
+                    scheduleParts.secondPeriod
+                      ? false
+                      : existingSchedule.is_second_period_order,
+                    scheduleParts.thirdPeriod
+                      ? false
+                      : existingSchedule.is_third_period_order,
+                    scheduleParts.fourthPeriod
+                      ? false
+                      : existingSchedule.is_fourth_period_order,
                   ]
                 );
               }
@@ -519,7 +544,9 @@ const OrderController = () => {
         await client.query(
           `UPDATE schedule SET date = $2, first_period = $3,
            second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-           second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+           second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
+           is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
+           is_fourth_period_order = $14
            WHERE id = $1 RETURNING *`,
           [
             existingSchedule.id,
@@ -528,14 +555,19 @@ const OrderController = () => {
               existingSchedule,
               scheduleParts
             ),
+            !scheduleParts.firstPeriod,
+            !scheduleParts.secondPeriod,
+            !scheduleParts.thirdPeriod,
+            !scheduleParts.fourthPeriod,
           ]
         );
       } else {
         await client.query(
           `INSERT INTO schedule (employee_id, date, first_period, second_period,
            third_period, fourth_period, first_period_additional,
-           second_period_additional, third_period_additional, fourth_period_additional)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+           second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
+           is_second_period_order, is_third_period_order, is_fourth_period_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
           [
             +cleanerId,
             orderDate,
@@ -547,6 +579,10 @@ const OrderController = () => {
             scheduleParts.secondPeriodAdditional,
             scheduleParts.thirdPeriodAdditional,
             scheduleParts.fourthPeriodAdditional,
+            !scheduleParts.firstPeriod,
+            !scheduleParts.secondPeriod,
+            !scheduleParts.thirdPeriod,
+            !scheduleParts.fourthPeriod,
           ]
         );
       }
@@ -861,7 +897,9 @@ const OrderController = () => {
         await client.query(
           `UPDATE schedule SET date = $2, first_period = $3,
                    second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
+                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
+                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
+                   is_fourth_period_order = $14
                    WHERE id = $1 RETURNING *`,
           [
             existingSchedule.id,
@@ -870,6 +908,18 @@ const OrderController = () => {
               existingSchedule,
               scheduleParts
             ),
+            scheduleParts.firstPeriod
+              ? false
+              : existingSchedule.is_first_period_order,
+            scheduleParts.secondPeriod
+              ? false
+              : existingSchedule.is_second_period_order,
+            scheduleParts.thirdPeriod
+              ? false
+              : existingSchedule.is_third_period_order,
+            scheduleParts.fourthPeriod
+              ? false
+              : existingSchedule.is_fourth_period_order,
           ]
         );
       }

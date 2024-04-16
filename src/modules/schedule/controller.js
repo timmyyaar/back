@@ -15,6 +15,10 @@ const getTransformedScheduleItem = (item) => ({
   secondPeriodAdditional: item.second_period_additional,
   thirdPeriodAdditional: item.third_period_additional,
   fourthPeriodAdditional: item.fourth_period_additional,
+  isFirstPeriodOrder: item.is_first_period_order,
+  isSecondPeriodOrder: item.is_second_period_order,
+  isThirdPeriodOrder: item.is_third_period_order,
+  isFourthPeriodOrder: item.is_fourth_period_order,
 });
 
 const ScheduleController = () => {
