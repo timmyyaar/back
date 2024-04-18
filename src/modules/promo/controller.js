@@ -17,7 +17,7 @@ const PromoController = () => {
 
     try {
       await client.connect();
-      const result = await client.query('SELECT * FROM "promo"');
+      const result = await client.query("SELECT * FROM promo ORDER BY id DESC");
 
       res.json(result.rows);
     } catch (error) {
@@ -36,14 +36,17 @@ const PromoController = () => {
       const result = await client.query("SELECT * FROM promo WHERE code = $1", [
         code,
       ]);
+      const promo = result.rows[0];
 
-      if (result.rows.length === 0) {
-        res.status(404).json({ message: "Promo not found" });
+      if (!promo) {
+        return res.status(404).json({ message: "Promo not found" });
+      } else if (promo.count && promo.count_used >= promo.count) {
+        return res.status(410).json({ message: "Promo expired" });
       } else {
-        res.status(200).json({ promo: result.rows[0] });
+        return res.status(200).json({ promo });
       }
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
@@ -54,15 +57,27 @@ const PromoController = () => {
 
     try {
       await client.connect();
-      const { code, author, sale } = req.body;
+
+      const { code, author, sale, count } = req.body;
+
+      const existingPromoQuery = await client.query(
+        "SELECT * FROM promo WHERE code = $1",
+        [code]
+      );
+      const existingPromo = existingPromoQuery.rows[0];
+
+      if (existingPromo) {
+        return res.status(409).json({ message: "Promo already exists!" });
+      }
+
       const result = await client.query(
-        "INSERT INTO promo (code, author, sale) VALUES ($1, $2, $3) RETURNING *",
-        [code, author, sale]
+        "INSERT INTO promo (code, author, sale, count) VALUES ($1, $2, $3, $4) RETURNING *",
+        [code, author, sale, count]
       );
 
-      res.status(201).json(result.rows[0]);
+      return res.status(201).json(result.rows[0]);
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
