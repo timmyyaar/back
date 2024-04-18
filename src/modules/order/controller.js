@@ -238,7 +238,9 @@ const OrderController = () => {
 
           await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
 
-          res.status(200).json({ order: result.rows });
+          return res
+            .status(200)
+            .json(result.rows.map((order) => ({ ...order, cleaner_id: [] })));
         } else {
           const result = await client.query(
             `INSERT INTO "order" 
@@ -279,13 +281,18 @@ const OrderController = () => {
 
           await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
 
-          res.status(200).json({ order: result.rows[0] });
+          const createdOrder = result.rows[0];
+
+          return res.status(200).json({
+            ...createdOrder,
+            cleaner_id: [],
+          });
         }
       } else {
-        res.status(422).json({ message: "Unprocessable Entity" });
+        return res.status(422).json({ message: "Unprocessable Entity" });
       }
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
