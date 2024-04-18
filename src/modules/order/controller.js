@@ -156,6 +156,24 @@ const OrderController = () => {
           if (isPromoUsed.rows[0]) {
             return res.status(409).send("Promo already used!");
           }
+
+          const existingPromoQuery = await client.query(
+            "SELECT * FROM promo WHERE code = $1",
+            [promo]
+          );
+          const existingPromo = existingPromoQuery.rows[0];
+
+          if (
+            existingPromo.count &&
+            existingPromo.count_used + 1 > existingPromo.count
+          ) {
+            return res.status(410).send("This promo is expired!");
+          } else {
+            await client.query(
+              "UPDATE promo SET count_used = $1 WHERE id = $2",
+              [existingPromo.count_used + 1, existingPromo.id]
+            );
+          }
         }
 
         const isClientExists = await client.query(
