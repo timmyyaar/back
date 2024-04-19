@@ -182,6 +182,8 @@ const UsersController = () => {
         role,
         haveVacuumCleaner = false,
         haveCar = false,
+        firstName = "",
+        lastName = "",
       } = req.body;
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -205,8 +207,17 @@ const UsersController = () => {
       }
 
       const result = await client.query(
-        "INSERT INTO users(email, password, role, have_vacuum_cleaner, have_car) VALUES($1, $2, $3, $4, $5) RETURNING *",
-        [email, hashedPassword, role, haveVacuumCleaner, haveCar]
+        `INSERT INTO users(email, password, role, have_vacuum_cleaner,
+         have_car, first_name, last_name) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [
+          email,
+          hashedPassword,
+          role,
+          haveVacuumCleaner,
+          haveCar,
+          firstName,
+          lastName,
+        ]
       );
 
       res.status(200).json(getUserWithRating(result.rows[0]));
@@ -217,7 +228,7 @@ const UsersController = () => {
     }
   };
 
-  const updateUserRole = async (req, res) => {
+  const updateUser = async (req, res) => {
     const client = getClient();
 
     if (req.role !== constants.ROLES.ADMIN) {
@@ -227,59 +238,21 @@ const UsersController = () => {
     }
 
     try {
-      const { role } = req.body;
-      const id = req.params.id;
-
-      await client.connect();
-
-      const userQuery = await client.query(
-        "SELECT * FROM users WHERE id = $1",
-        [id]
-      );
-      const existingUser = userQuery.rows[0];
-
-      if (existingUser.role === role) {
-        return res
-          .status(422)
-          .json({ message: "User already have this role!" });
-      }
-
-      const result = await client.query(
-        "UPDATE users SET role = $2 WHERE id = $1 RETURNING *",
-        [id, role]
-      );
-
-      res.status(200).json(getUserWithRating(result.rows[0]));
-    } catch (error) {
-      res.status(500).json({ error });
-    } finally {
-      await client.end();
-    }
-  };
-
-  const updateUserDetails = async (req, res) => {
-    const client = getClient();
-
-    if (req.role !== constants.ROLES.ADMIN) {
-      return res
-        .status(403)
-        .json({ message: "You don't have access to this!" });
-    }
-
-    try {
-      const { haveVacuumCleaner, haveCar } = req.body;
+      const { role, haveVacuumCleaner, haveCar, firstName, lastName } =
+        req.body;
       const id = req.params.id;
 
       await client.connect();
 
       const result = await client.query(
-        "UPDATE users SET have_vacuum_cleaner = $2, have_car = $3 WHERE id = $1 RETURNING *",
-        [id, haveVacuumCleaner, haveCar]
+        `UPDATE users SET role = $2, have_vacuum_cleaner = $3, have_car = $4,
+           first_name = $5, last_name = $6 WHERE id = $1 RETURNING *`,
+        [id, role, haveVacuumCleaner, haveCar, firstName, lastName]
       );
 
-      res.status(200).json(getUserWithRating(result.rows[0]));
+      return res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
@@ -388,10 +361,9 @@ const UsersController = () => {
     getUsers,
     getMyUser,
     createUser,
-    updateUserRole,
+    updateUser,
     changePassword,
     deleteUser,
-    updateUserDetails,
     updateUserRating,
   };
 };
