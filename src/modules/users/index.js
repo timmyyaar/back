@@ -11,16 +11,11 @@ usersRouter
   .get("/users", verifyToken, usersController.getUsers)
   .get("/users/my-user", verifyToken, usersController.getMyUser)
   .post("/users", verifyToken, usersController.createUser)
-  .patch("/users/:id/update-role", verifyToken, usersController.updateUserRole)
+  .put("/users/:id", verifyToken, usersController.updateUser)
   .patch(
     "/users/:id/change-password",
     verifyToken,
     usersController.changePassword
-  )
-  .patch(
-    "/users/:id/update-details",
-    verifyToken,
-    usersController.updateUserDetails
   )
   .patch(
     "/users/:id/update-rating",
