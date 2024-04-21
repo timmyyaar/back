@@ -6,10 +6,13 @@ const { getEmailHtmlTemplate } = require("./emailHtmlTemplate");
 
 const env = require("../../helpers/environments");
 
+const { ORDER_TYPES } = require("../../constants");
+
 const {
   getSchedulePartsByOrder,
   getUpdatedScheduleDetailsForEdit,
   getUpdatedScheduleDetailsForDelete,
+  getOrderCheckList,
 } = require("./utils");
 
 const VACUUM_CLEANER_SUB_SERVICE = "Vacuum_cleaner_sub_service_summery";
@@ -142,6 +145,7 @@ const OrderController = () => {
         secondServiceCleanersCount,
         language,
         creationDate,
+        ownCheckList = false,
       } = req.body;
 
       if (name && number && email && address && date && city) {
@@ -197,10 +201,10 @@ const OrderController = () => {
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
-              is_new_client, city, transportation_price, cleaners_count, language, creation_date) 
+              is_new_client, city, transportation_price, cleaners_count, language, creation_date, own_check_list) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32) RETURNING *`,
             [
               name,
               number,
@@ -233,10 +237,13 @@ const OrderController = () => {
               secondServiceCleanersCount,
               language,
               creationDate,
+              ownCheckList,
             ]
           );
 
-          await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+          if (env.getEnvironment("MODE") !== "dev") {
+            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+          }
 
           return res
             .status(200)
@@ -248,9 +255,9 @@ const OrderController = () => {
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
-             is_new_client, city, transportation_price, cleaners_count, language, creation_date) 
+             is_new_client, city, transportation_price, cleaners_count, language, creation_date, own_check_list) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) RETURNING *`,
             [
               name,
               number,
@@ -276,10 +283,13 @@ const OrderController = () => {
               mainServiceCleanersCount,
               language,
               creationDate,
+              ownCheckList,
             ]
           );
 
-          await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+          if (env.getEnvironment("MODE") !== "dev") {
+            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+          }
 
           const createdOrder = result.rows[0];
 
@@ -335,9 +345,27 @@ const OrderController = () => {
         return res.status(404).json({ message: "Order not found" });
       }
 
+      const isDryCleaningOrOzonation = [
+        ORDER_TYPES.DRY,
+        ORDER_TYPES.OZONATION,
+      ].includes(existingOrder.title);
+
+      const isApprovedStatus = cleanerId.length > 0;
+
+      const updatedCheckList =
+        isApprovedStatus && !existingOrder.is_confirmed
+          ? JSON.stringify(getOrderCheckList(existingOrder))
+          : existingOrder.check_list;
+
       const result = await client.query(
-        'UPDATE "order" SET cleaner_id = $2, status = $3 WHERE id = $1 RETURNING *',
-        [id, cleanerId.join(","), cleanerId.length > 0 ? "approved" : "created"]
+        'UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4, is_confirmed = $5 WHERE id = $1 RETURNING *',
+        [
+          id,
+          cleanerId.join(","),
+          isApprovedStatus ? "approved" : "created",
+          isDryCleaningOrOzonation ? null : updatedCheckList,
+          isApprovedStatus ? true : existingOrder.is_confirmed,
+        ]
       );
 
       const existingOrderCleaners = existingOrder.cleaner_id
@@ -630,6 +658,8 @@ const OrderController = () => {
       const id = req.params.id;
       const status = req.params.status;
 
+      const { checkList } = req.body;
+
       await client.connect();
 
       const existingOrderQuery = await client.query(
@@ -658,14 +688,28 @@ const OrderController = () => {
         "base64"
       );
 
+      const isDryCleaningOrOzonation = [
+        ORDER_TYPES.DRY,
+        ORDER_TYPES.OZONATION,
+      ].includes(existingOrder.title);
+
+      const updatedCheckList =
+        status === ORDER_STATUS.DONE && checkList
+          ? JSON.stringify(checkList)
+          : status === ORDER_STATUS.APPROVED && !existingOrder.is_confirmed
+          ? JSON.stringify(getOrderCheckList(existingOrder))
+          : existingOrder.check_list;
+
       const result = await client.query(
-        'UPDATE "order" SET status = $2, feedback_link_id = $3 WHERE id = $1 RETURNING *',
+        'UPDATE "order" SET status = $2, feedback_link_id = $3, check_list = $4, is_confirmed = $5 WHERE id = $1 RETURNING *',
         [
           id,
           status,
           status === ORDER_STATUS.IN_PROGRESS
             ? base64Orders
             : existingOrder.feedback_link_id,
+          isDryCleaningOrOzonation ? null : updatedCheckList,
+          status === ORDER_STATUS.APPROVED ? true : existingOrder.is_confirmed,
         ]
       );
 
@@ -684,13 +728,15 @@ const OrderController = () => {
           ORDER_TITLES.OZONATION,
         ].includes(updatedOrder.title);
 
-        await sendTelegramMessage(
-          updatedOrder.date,
-          isDryOrOzonation
-            ? APPROVED_DRY_OZONATION_CHANNEL_ID
-            : APPROVED_REGULAR_CHANNEL_ID,
-          updatedOrder.title
-        );
+        if (env.getEnvironment("MODE") !== "dev") {
+          await sendTelegramMessage(
+            updatedOrder.date,
+            isDryOrOzonation
+              ? APPROVED_DRY_OZONATION_CHANNEL_ID
+              : APPROVED_REGULAR_CHANNEL_ID,
+            updatedOrder.title
+          );
+        }
       }
 
       if (
@@ -698,6 +744,7 @@ const OrderController = () => {
         updatedOrder.feedback_link_id &&
         (!connectedOrder || connectedOrder.status === ORDER_STATUS.DONE)
       ) {
+        console.log("wtf");
         await transporter.sendMail({
           from: "tytfeedback@gmail.com",
           to: updatedOrder.email,
@@ -756,6 +803,7 @@ const OrderController = () => {
         dateCreated,
         note = null,
         reward = null,
+        ownCheckList = false,
       } = req.body;
 
       await client.connect();
@@ -765,7 +813,7 @@ const OrderController = () => {
                date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
                counter = $11, subService = $12, total_service_price = $13,
                total_service_price_original = $14, price_original = $15, creation_date = $16,
-               note = $17, reward = $18 WHERE id = $1 RETURNING *`,
+               note = $17, reward = $18, own_check_list = $19 WHERE id = $1 RETURNING *`,
         [
           id,
           name,
@@ -785,6 +833,7 @@ const OrderController = () => {
           dateCreated,
           note,
           reward,
+          ownCheckList,
         ]
       );
 

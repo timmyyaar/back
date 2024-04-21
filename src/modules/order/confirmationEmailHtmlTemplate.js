@@ -1,9 +1,9 @@
 const { emailTranslations } = require("./constants");
 
 const getEmailHtmlTemplate = (updatedOrder) => {
-  const t = emailTranslations[updatedOrder.language];
+		const t = emailTranslations[updatedOrder.language];
 
-  return `<div style="background-color: #ecf0ff; padding: 24px; font-size: 16px;">
+		return `<div style="background-color: #ecf0ff; padding: 24px; font-size: 16px;">
                     <head>
                         <title>Take Your Time</title>
                         <meta name="color-scheme" content="light">
@@ -83,5 +83,5 @@ const getEmailHtmlTemplate = (updatedOrder) => {
 };
 
 module.exports = {
-  getEmailHtmlTemplate,
+		getEmailHtmlTemplate,
 };

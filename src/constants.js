@@ -1,13 +1,36 @@
 const EMAIL_REGEX =
   /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 
+const BRACKETS_REGEX = /\([^()]*\)/;
+
 const ROLES = {
   ADMIN: "admin",
   CLEANER: "cleaner",
   CLIENT: "client",
 };
 
+const ORDER_TYPES = {
+  REGULAR: "Regular",
+  SUBSCRIPTION: "Subscription",
+  ECO: "Eco cleaning",
+  OFFICE: "Office",
+  DEEP_KITCHEN: "Deep kitchen",
+  CUSTOM: "Custom cleaning",
+  DEEP: "Deep",
+  MOVE: "Move in/out",
+  AFTER_PARTY: "After party",
+  LAST_MINUTE: "In a last minute",
+  WHILE_SICK: "While sickness",
+  AIRBNB: "Airbnb",
+  OZONATION: "Ozonation",
+  POST_CONSTRUCTION: "Post-construction",
+  DRY: "Dry cleaning",
+  WINDOW: "Window cleaning",
+};
+
 module.exports = {
   EMAIL_REGEX,
+  BRACKETS_REGEX,
   ROLES,
+  ORDER_TYPES,
 };
