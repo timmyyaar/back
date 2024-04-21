@@ -8,6 +8,8 @@ const env = require("../../helpers/environments");
 
 const { ORDER_TYPES } = require("../../constants");
 
+const { getCleanerReward } = require("./price-utils");
+
 const {
   getSchedulePartsByOrder,
   getUpdatedScheduleDetailsForEdit,
@@ -201,10 +203,11 @@ const OrderController = () => {
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
-              is_new_client, city, transportation_price, cleaners_count, language, creation_date, own_check_list) 
+              is_new_client, city, transportation_price, cleaners_count, language, 
+              creation_date, own_check_list, reward_original) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34) RETURNING *`,
             [
               name,
               number,
@@ -238,6 +241,20 @@ const OrderController = () => {
               language,
               creationDate,
               ownCheckList,
+              getCleanerReward({
+                title,
+                price_original: mainServicePriceOriginal,
+                cleaners_count: mainServiceCleanersCount,
+                estimate: mainServiceEstimate,
+                price: mainServicePrice,
+              }),
+              getCleanerReward({
+                title: secTitle,
+                price_original: secondServicePriceOriginal,
+                cleaners_count: secondServiceCleanersCount,
+                estimate: secondServiceEstimate,
+                price: secondServicePrice,
+              }),
             ]
           );
 
@@ -255,9 +272,10 @@ const OrderController = () => {
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
-             is_new_client, city, transportation_price, cleaners_count, language, creation_date, own_check_list) 
+             is_new_client, city, transportation_price, cleaners_count, language, 
+             creation_date, own_check_list, reward_original) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26) RETURNING *`,
             [
               name,
               number,
@@ -284,6 +302,13 @@ const OrderController = () => {
               language,
               creationDate,
               ownCheckList,
+              getCleanerReward({
+                title,
+                price_original: mainServicePriceOriginal,
+                cleaners_count: mainServiceCleanersCount,
+                estimate: mainServiceEstimate,
+                price: mainServicePrice,
+              }),
             ]
           );
 
@@ -302,6 +327,7 @@ const OrderController = () => {
         return res.status(422).json({ message: "Unprocessable Entity" });
       }
     } catch (error) {
+        console.log(error)
       return res.status(500).json({ error });
     } finally {
       await client.end();
@@ -744,7 +770,6 @@ const OrderController = () => {
         updatedOrder.feedback_link_id &&
         (!connectedOrder || connectedOrder.status === ORDER_STATUS.DONE)
       ) {
-        console.log("wtf");
         await transporter.sendMail({
           from: "tytfeedback@gmail.com",
           to: updatedOrder.email,
@@ -1009,6 +1034,37 @@ const OrderController = () => {
     }
   };
 
+  const updateOrderExtraExpenses = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const id = req.params.id;
+      const { extraExpenses } = req.body;
+
+      await client.connect();
+
+      const result = await client.query(
+        `UPDATE "order" SET extra_expenses = $2 WHERE id = $1 RETURNING *`,
+        [id, extraExpenses]
+      );
+
+      const updatedOrder = result.rows[0];
+      const updatedOrderCleanerId = updatedOrder.cleaner_id
+        ? updatedOrder.cleaner_id.split(",")
+        : [];
+
+      return res.status(200).json({
+        ...updatedOrder,
+        cleaner_id: updatedOrderCleanerId.map((item) => +item),
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
   return {
     getOrder,
     getClientOrder,
@@ -1020,6 +1076,7 @@ const OrderController = () => {
     assignOnMe,
     sendFeedback,
     refuseOrder,
+    updateOrderExtraExpenses,
   };
 };
 

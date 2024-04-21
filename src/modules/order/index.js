@@ -14,6 +14,11 @@ orderRouter
   .put("/order/:id", verifyToken, orderController.updateOrder)
   .delete("/order/:id", verifyToken, orderController.deleteOrder)
   .patch("/order/refuse/:id", verifyToken, orderController.refuseOrder)
+  .patch(
+    "/order/extra-expenses/:id",
+    verifyToken,
+    orderController.updateOrderExtraExpenses
+  )
   .patch("/order/:id/assign", verifyToken, orderController.assignOrder)
   .patch("/order/:id/:cleanerId", verifyToken, orderController.assignOnMe)
   .patch(
