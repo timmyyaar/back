@@ -3,6 +3,9 @@ const nodemailer = require("nodemailer");
 
 const { getUpdatedUserRating } = require("../../utils");
 const { getEmailHtmlTemplate } = require("./emailHtmlTemplate");
+const {
+  getConfirmationEmailHtmlTemplate,
+} = require("./confirmationEmailHtmlTemplate");
 
 const env = require("../../helpers/environments");
 
@@ -35,6 +38,7 @@ const {
   ORDER_TITLES,
   ORDER_STATUS,
   emailSubjectTranslation,
+  confirmationEmailSubjectTranslation,
 } = require("./constants");
 
 const sendTelegramMessage = async (date, channel, title) => {
@@ -327,7 +331,7 @@ const OrderController = () => {
         return res.status(422).json({ message: "Unprocessable Entity" });
       }
     } catch (error) {
-        console.log(error)
+      console.log(error);
       return res.status(500).json({ error });
     } finally {
       await client.end();
@@ -378,10 +382,11 @@ const OrderController = () => {
 
       const isApprovedStatus = cleanerId.length > 0;
 
-      const updatedCheckList =
-        isApprovedStatus && !existingOrder.is_confirmed
-          ? JSON.stringify(getOrderCheckList(existingOrder))
-          : existingOrder.check_list;
+      const updatedCheckList = isDryCleaningOrOzonation
+        ? null
+        : isApprovedStatus && !existingOrder.is_confirmed
+        ? JSON.stringify(getOrderCheckList(existingOrder))
+        : existingOrder.check_list;
 
       const result = await client.query(
         'UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4, is_confirmed = $5 WHERE id = $1 RETURNING *',
@@ -389,7 +394,7 @@ const OrderController = () => {
           id,
           cleanerId.join(","),
           isApprovedStatus ? "approved" : "created",
-          isDryCleaningOrOzonation ? null : updatedCheckList,
+          updatedCheckList,
           isApprovedStatus ? true : existingOrder.is_confirmed,
         ]
       );
@@ -525,11 +530,48 @@ const OrderController = () => {
         ? updatedOrder.cleaner_id.split(",")
         : [];
 
-      res
+      if (isApprovedStatus && !existingOrder.is_confirmed) {
+        const localesQuery = await client.query("SELECT * FROM locales");
+        const locales = localesQuery.rows;
+        const currentLanguageLocales = locales
+          .filter(({ locale }) => locale === updatedOrder.language)
+          .reduce(
+            (result, { key, value }) => ({
+              ...result,
+              [key]: value,
+            }),
+            {}
+          );
+
+        await transporter.sendMail({
+          from: "tytfeedback@gmail.com",
+          to: updatedOrder.email,
+          subject: confirmationEmailSubjectTranslation[updatedOrder.language],
+          html: getConfirmationEmailHtmlTemplate(
+            updatedOrder,
+            currentLanguageLocales,
+            updatedCheckList
+          ),
+          attachments: [
+            {
+              filename: "logo.png",
+              path: __dirname + "/images/logo.png",
+              cid: "logo@nodemailer.com",
+            },
+            {
+              filename: "bubbles.png",
+              path: __dirname + "/images/bubbles.png",
+              cid: "bubbles@nodemailer.com",
+            },
+          ],
+        });
+      }
+
+      return res
         .status(200)
         .json({ ...updatedOrder, cleaner_id: cleaner_id.map((item) => +item) });
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
@@ -719,12 +761,13 @@ const OrderController = () => {
         ORDER_TYPES.OZONATION,
       ].includes(existingOrder.title);
 
-      const updatedCheckList =
-        status === ORDER_STATUS.DONE && checkList
-          ? JSON.stringify(checkList)
-          : status === ORDER_STATUS.APPROVED && !existingOrder.is_confirmed
-          ? JSON.stringify(getOrderCheckList(existingOrder))
-          : existingOrder.check_list;
+      const updatedCheckList = isDryCleaningOrOzonation
+        ? null
+        : status === ORDER_STATUS.DONE && checkList
+        ? JSON.stringify(checkList)
+        : status === ORDER_STATUS.APPROVED && !existingOrder.is_confirmed
+        ? JSON.stringify(getOrderCheckList(existingOrder))
+        : existingOrder.check_list;
 
       const result = await client.query(
         'UPDATE "order" SET status = $2, feedback_link_id = $3, check_list = $4, is_confirmed = $5 WHERE id = $1 RETURNING *',
@@ -734,7 +777,7 @@ const OrderController = () => {
           status === ORDER_STATUS.IN_PROGRESS
             ? base64Orders
             : existingOrder.feedback_link_id,
-          isDryCleaningOrOzonation ? null : updatedCheckList,
+          updatedCheckList,
           status === ORDER_STATUS.APPROVED ? true : existingOrder.is_confirmed,
         ]
       );
@@ -753,6 +796,43 @@ const OrderController = () => {
           ORDER_TITLES.DRY_CLEANING,
           ORDER_TITLES.OZONATION,
         ].includes(updatedOrder.title);
+
+        if (!existingOrder.is_confirmed) {
+          const localesQuery = await client.query("SELECT * FROM locales");
+          const locales = localesQuery.rows;
+          const currentLanguageLocales = locales
+            .filter(({ locale }) => locale === updatedOrder.language)
+            .reduce(
+              (result, { key, value }) => ({
+                ...result,
+                [key]: value,
+              }),
+              {}
+            );
+
+          await transporter.sendMail({
+            from: "tytfeedback@gmail.com",
+            to: updatedOrder.email,
+            subject: confirmationEmailSubjectTranslation[updatedOrder.language],
+            html: getConfirmationEmailHtmlTemplate(
+              updatedOrder,
+              currentLanguageLocales,
+              updatedCheckList
+            ),
+            attachments: [
+              {
+                filename: "logo.png",
+                path: __dirname + "/images/logo.png",
+                cid: "logo@nodemailer.com",
+              },
+              {
+                filename: "bubbles.png",
+                path: __dirname + "/images/bubbles.png",
+                cid: "bubbles@nodemailer.com",
+              },
+            ],
+          });
+        }
 
         if (env.getEnvironment("MODE") !== "dev") {
           await sendTelegramMessage(

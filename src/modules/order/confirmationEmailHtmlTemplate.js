@@ -1,9 +1,30 @@
 const { emailTranslations } = require("./constants");
+const { capitalizeFirstLetter } = require("../../utils");
 
-const getEmailHtmlTemplate = (updatedOrder) => {
-		const t = emailTranslations[updatedOrder.language];
+const getConfirmationEmailHtmlTemplate = (
+  updatedOrder,
+  locales,
+  updatedCheckList
+) => {
+  const t = emailTranslations[updatedOrder.language];
+  const parsedCheckList = updatedCheckList ? JSON.parse(updatedCheckList) : {};
+  const checkListEntries = Object.entries(parsedCheckList)
+    .reduce(
+      (result, [key, value]) => [
+        ...result,
+        [
+          locales[capitalizeFirstLetter(key)],
+          Object.keys(value)
+            .map((item) => locales[item])
+            .map((service) => service.replaceAll(/[{}]/g, ""))
+            .join("; "),
+        ],
+      ],
+      []
+    )
+    .filter(([_, value]) => value.length > 0);
 
-		return `<div style="background-color: #ecf0ff; padding: 24px; font-size: 16px;">
+  return `<div style="background-color: #ecf0ff; padding: 24px; font-size: 16px;">
                     <head>
                         <title>Take Your Time</title>
                         <meta name="color-scheme" content="light">
@@ -53,18 +74,33 @@ const getEmailHtmlTemplate = (updatedOrder) => {
                         <img src="cid:bubbles@nodemailer.com" alt="" style="margin-left: auto;"/>
                     </div>
                     <b class="title mobile-only" style="color: #13277e; font-size: 40px; font-weight: bold; line-height: 130%; margin-top: 6px">Take Your Time</b>
-                    <div style="font-size: 18px; line-height: 22px; font-weight: 600; margin-bottom: 24px; margin-top: 24px;">
+                    <div style="font-size: 18px; line-height: 22px; font-weight: 600; margin-bottom: 16px; margin-top: 24px;">
                         ${t.dear_client} ${updatedOrder.name},  
                     </div>
                     <div>
-                        <p>${t.hope_email}</p>
-                        <p>${t.express_gratitude}</p>
-                        <p>${t.spare_moments}</p>
-                        <p><span style="font-weight: 600;">${t.click_link_google}</span> <a href="https://g.page/r/CW4tBwhrljwjEBI/review" target="_blank">https://g.page/r/CW4tBwhrljwjEBI/review </a></p>
-                        <p><span style="font-weight: 600;">${t.review_cleaners}</span> <a href="https://www.takeutime.pl/feedback?orders=${updatedOrder.feedback_link_id}" target="_blank">https://www.takeutime.pl/order/feedback?orders=${updatedOrder.feedback_link_id}</a></p>
-                        <p>${t.thank_you_again}</p>
-                        <p>${t.warm_regards}</p>
-                        <div style="margin-top: 36px">
+											  ${t.cleaning_scheduled(updatedOrder.date, checkListEntries.length > 0)}
+                    </div>
+                    ${
+                      checkListEntries.length > 0
+                        ? `<div style="margin-top: 16px; margin-bottom: 16px;">
+                        <b style="font-size: 18px; line-height: 22px;">
+													${locales.check_list}:
+												</b>
+                    </div>`
+                        : ""
+                    }
+                    ${checkListEntries
+                      .map(
+                        ([title, services]) => `
+												<div style="margin-top: 8px;"><b style="font-size: 18px; line-height: 22px;">
+													<b>${title}:</b>
+													<br />
+												</div>${services}`
+                      )
+                      .join("")}
+                    <div>
+                        <p style="margin-top: 36px">${t.warm_regards}</p>
+                        <div>
                             <div>
                                 <span style="font-weight: 600;">Web-page: </span><a href="https://www.takeutime.pl/" target="_blank">https://www.takeutime.pl/</a>
                             </div>
@@ -83,5 +119,5 @@ const getEmailHtmlTemplate = (updatedOrder) => {
 };
 
 module.exports = {
-		getEmailHtmlTemplate,
+  getConfirmationEmailHtmlTemplate,
 };
