@@ -21,6 +21,13 @@ const emailSubjectTranslation = {
   ua: "Take Your Time, допоможіть нам розвиватися, залишивши відгук",
 };
 
+const confirmationEmailSubjectTranslation = {
+  en: "Your cleaning appointment is scheduled!",
+  pl: "Przypisano sprzątanie!",
+  ru: "Ваша уборка назначена!",
+  ua: "Призначено прибирання!",
+};
+
 const emailTranslations = {
   en: {
     dear_client: "Dear",
@@ -34,6 +41,16 @@ const emailTranslations = {
     thank_you_again:
       "Thank you again for choosing our services and considering sharing your insights.",
     warm_regards: "Warm regards, Take Your Time",
+    cleaning_scheduled: (
+      date,
+      showCheckList
+    ) => `We have great news - we have successfully scheduled the cleaning of your space for <b>${date}</b>. We are ready to provide you with our professional services to ensure freshness and cleanliness to your home or office. <br />
+${
+  showCheckList
+    ? `Before we arrive, please review the attached cleaning checklist. It details what will be included in the cleaning process. If you have any special requests or requirements, please feel free to inform us. <br />`
+    : ""
+}
+We are confident that you will be pleased with our work. Our team is ready to go and looks forward to meeting you at the appointed time`,
   },
   pl: {
     dear_client: "Szanowni",
@@ -47,6 +64,16 @@ const emailTranslations = {
     thank_you_again:
       "Jeszcze raz dziękujemy za wybór naszych usług oraz za rozważenie podzielenia się swoimi spostrzeżeniami.",
     warm_regards: "Z serdecznymi pozdrowieniami, Take Your Time",
+    cleaning_scheduled: (
+      date,
+      showCheckList
+    ) => `Mamy świetną wiadomość - właśnie przypisaliśmy sprzątanie Państwa przestrzeni na <b>${date}</b>. Jesteśmy gotowi zapewnić Państwa domowi lub biuru świeżość i czystość dzięki naszym profesjonalnym usługom. <br />
+${
+  showCheckList
+    ? `Przed naszym przybyciem prosimy o zapoznanie się z załączonym check-listem sprzątania. Zawiera on szczegóły dotyczące tego, co będzie zawarte w procesie sprzątania. Jeśli mają Państwo jakiekolwiek specjalne życzenia lub wymagania, prosimy o poinformowanie nas o nich. <br/>`
+    : ""
+}
+Jesteśmy pewni, że będą Państwo zadowoleni z naszej pracy. Nasz zespół jest gotowy do działania i czeka na spotkanie z Państwem o wyznaczonej godzinie.`,
   },
   ru: {
     dear_client: "Дорогой",
@@ -61,6 +88,16 @@ const emailTranslations = {
     thank_you_again:
       "Спасибо вам еще раз за выбор наших услуг и за рассмотрение возможности поделиться вашими впечатлениями.",
     warm_regards: "С наилучшими пожеланиями, Take Your Time",
+    cleaning_scheduled: (
+      date,
+      showCheckList
+    ) => `Хотим сообщить вам отличную новость - мы успешно назначили уборку вашего пространства на <b>${date}</b>. Мы готовы предоставить вам наши профессиональные услуги, чтобы обеспечить вашему дому или офису свежесть и чистоту. <br />
+${
+  showCheckList
+    ? `Прежде чем мы прибудем, просмотрите, пожалуйста, прикрепленный чек-лист уборки. В нем указаны детали того, что будет включено в процесс уборки. Если у вас есть какие-либо особые пожелания или требования, не стесняйтесь сообщить нам об этом. <br />`
+    : ""
+}
+Мы уверены, что вы останетесь довольны нашей работой. Наша команда готова к работе и ждет встречи с вами в указанное время.`,
   },
   ua: {
     dear_client: "Шановн(а/ий)",
@@ -75,6 +112,16 @@ const emailTranslations = {
     thank_you_again:
       "Ще раз дякуємо вам за вибір наших послуг та за розгляд можливості поділитися вашими думками.",
     warm_regards: "З найкращими побажаннями, Take Your Time",
+    cleaning_scheduled: (
+      date,
+      showCheckList
+    ) => `Ми маємо чудову новину - ми успішно призначили прибирання вашого простору на <b>${date}</b>. Ми готові надати вам наші професійні послуги, щоб забезпечити вашому будинку або офісу свіжість і чистоту. <br />
+${
+  showCheckList
+    ? `Перед нашим прибуттям, будь ласка, ознайомтеся з доданим чек-листом прибирання. В ньому вказано деталі того, що буде включено в процес прибирання. Якщо у вас є які-небудь спеціальні побажання або вимоги, будь ласка, повідомте нас про них. <br />`
+    : ""
+}
+Ми впевнені, що ви залишитесь задоволені нашою роботою. Наша команда готова до роботи і чекає на зустріч з вами у вказаний час.`,
   },
 };
 
@@ -86,4 +133,5 @@ module.exports = {
   APPROVED_DRY_OZONATION_CHANNEL_ID,
   emailTranslations,
   emailSubjectTranslation,
+  confirmationEmailSubjectTranslation,
 };
