@@ -938,7 +938,7 @@ const OrderController = () => {
           dateCreated,
           note,
           reward,
-          ownCheckList,
+          ownCheckList || false,
         ]
       );
 
@@ -947,12 +947,12 @@ const OrderController = () => {
         ? updatedOrder.cleaner_id.split(",")
         : [];
 
-      res.status(200).json({
+      return res.status(200).json({
         ...updatedOrder,
         cleaner_id: updatedOrderCleanerId.map((item) => +item),
       });
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
