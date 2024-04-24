@@ -28,105 +28,88 @@ const {
   WHILE_SICK,
 } = require("./checkList");
 
-const getSchedulePartsByOrder = (existingOrder) => {
-  const orderDateTime = existingOrder.date.split(" ");
-  const orderStartTime = orderDateTime[1];
-  const orderStartHours = +orderStartTime.split(":")[0];
-  const orderStartMinutes = +orderStartTime.split(":")[1];
+const getTimeUnitWithPrefix = (timeUnit) =>
+  timeUnit < 10 ? `0${timeUnit}` : timeUnit;
 
-  const orderEstimateArray = existingOrder.estimate.split(", ");
-  const estimateHours = +orderEstimateArray[0].slice(
+const getEstimateInTimeFormat = (estimate) => {
+  const estimateArray = estimate.split(", ");
+  const estimateHours = +estimateArray[0].slice(
     0,
-    orderEstimateArray[0].indexOf("h")
+    estimateArray[0].indexOf("h")
   );
-  const estimateMinutes = +orderEstimateArray[1].slice(
+  const estimateMinutes = +estimateArray[1].slice(
     0,
-    orderEstimateArray[1].indexOf("m")
+    estimateArray[1].indexOf("m")
   );
-  const orderEndMinutesRaw = orderStartMinutes + estimateMinutes;
-  const orderEndMinutes =
-    orderEndMinutesRaw >= 60 ? orderEndMinutesRaw % 60 : orderEndMinutesRaw;
-  const orderEndHours =
-    orderEndMinutesRaw >= 60
-      ? orderStartHours + 1 + estimateHours
-      : orderStartHours + estimateHours;
-  const orderEndTime = `${
-    orderEndHours < 10 ? `0${orderEndHours}` : orderEndHours
-  }:${orderEndMinutes < 10 ? `0${orderEndMinutes}` : orderEndMinutes}`;
 
-  const orderFirstPart =
-    orderStartHours >= 10
-      ? null
-      : orderEndHours >= 10
-      ? `${orderStartTime} - 10:00`
-      : `${orderStartTime} - ${orderEndTime}`;
+  const estimateHoursWithPrefix = getTimeUnitWithPrefix(estimateHours);
+  const estimateMinutesWithPrefix = getTimeUnitWithPrefix(estimateMinutes);
 
-  const orderSecondPart =
-    orderStartHours >= 14 ||
-    orderEndHours < 10 ||
-    (orderEndHours === 10 && orderEndMinutes === 0)
-      ? null
-      : orderEndHours >= 14
-      ? orderStartHours < 10 ||
-        (orderStartHours === 10 && orderStartMinutes === 0)
-        ? "10:00 - 14:00"
-        : `${orderStartTime} - 14:00`
-      : orderStartHours < 10 ||
-        (orderStartHours === 10 && orderStartMinutes === 0)
-      ? `10:00 - ${orderEndTime}`
-      : `${orderStartTime} - ${orderEndTime}`;
+  return `${estimateHoursWithPrefix}:${estimateMinutesWithPrefix}`;
+};
 
-  const orderThirdPart =
-    orderStartHours >= 18 ||
-    orderEndHours < 14 ||
-    (orderEndHours === 14 && orderEndMinutes === 0)
-      ? null
-      : orderEndHours >= 18
-      ? orderStartHours < 14 ||
-        (orderStartHours === 14 && orderStartMinutes === 0)
-        ? "14:00 - 18:00"
-        : `${orderStartTime} - 18:00`
-      : orderStartHours < 14 ||
-        (orderStartHours === 14 && orderStartMinutes === 0)
-      ? `14:00 - ${orderEndTime}`
-      : `${orderStartTime} - ${orderEndTime}`;
+const getOrderEndTime = (orderTime, estimate) => {
+  const splitOrderTime = orderTime.split(":");
+  const splitEstimateTime = getEstimateInTimeFormat(estimate).split(":");
 
-  const orderFourthPart =
-    orderStartHours >= 22 ||
-    orderEndHours < 18 ||
-    (orderEndHours === 18 && orderEndMinutes === 0)
-      ? null
-      : orderEndHours >= 22
-      ? orderStartHours < 18 ||
-        (orderStartHours === 18 && orderStartMinutes === 0)
-        ? "18:00 - 22:00"
-        : `${orderStartTime} - 22:00`
-      : orderStartHours < 18 ||
-        (orderStartHours === 18 && orderStartMinutes === 0)
-      ? `18:00 - ${orderEndTime}`
-      : `${orderStartTime} - ${orderEndTime}`;
+  const hoursRaw = parseInt(splitOrderTime[0]) + parseInt(splitEstimateTime[0]);
+  const minutesRaw =
+    parseInt(splitOrderTime[1]) + parseInt(splitEstimateTime[1]);
+  const hours = hoursRaw + Math.trunc(minutesRaw / 60);
+  const minutes = minutesRaw % 60;
+
+  return `${getTimeUnitWithPrefix(hours)}:${getTimeUnitWithPrefix(minutes)}`;
+};
+
+const getOrderTimeSlot = (
+  startTime,
+  endTime,
+  startTimeOfSlot,
+  endTimeOfSlot
+) => {
+  const startTimeNumeric = Number(startTime.split(":").join("."));
+  const endTimeNumeric = Number(endTime.split(":").join("."));
+
+  if (startTimeNumeric >= endTimeOfSlot || endTimeNumeric <= startTimeOfSlot) {
+    return null;
+  }
+
+  if (endTimeNumeric >= endTimeOfSlot) {
+    if (startTimeNumeric <= startTimeOfSlot) {
+      return `${startTimeOfSlot}:00 - ${endTimeOfSlot}:00`;
+    } else {
+      return `${startTime} - ${endTimeOfSlot}:00`;
+    }
+  }
+
+  if (startTimeNumeric <= startTimeOfSlot) {
+    return `${startTimeOfSlot}:00 - ${endTime}`;
+  }
+
+  return `${startTime} - ${endTime}`;
+};
+
+const getSchedulePartsByOrder = (order) => {
+  const startTime = order.date.split(" ")[1];
+  const endTime = getOrderEndTime(startTime, order.estimate);
+
+  const firstPeriod = getOrderTimeSlot(startTime, endTime, 6, 10);
+  const secondPeriod = getOrderTimeSlot(startTime, endTime, 10, 14);
+  const thirdPeriod = getOrderTimeSlot(startTime, endTime, 14, 18);
+  const fourthPeriod = getOrderTimeSlot(startTime, endTime, 18, 22);
+
+  const getAdditionalPeriod = (orderPeriod, schedulePeriod) =>
+    !orderPeriod || orderPeriod === schedulePeriod ? null : orderPeriod;
 
   return {
-    firstPeriod: !orderFirstPart,
-    secondPeriod: !orderSecondPart,
-    thirdPeriod: !orderThirdPart,
-    fourthPeriod: !orderFourthPart,
-    firstPeriodAdditional:
-      !orderFirstPart || orderFirstPart === "06:00 - 10:00"
-        ? null
-        : orderFirstPart,
-    secondPeriodAdditional:
-      !orderSecondPart || orderSecondPart === "10:00 - 14:00"
-        ? null
-        : orderSecondPart,
-    thirdPeriodAdditional:
-      !orderThirdPart || orderThirdPart === "14:00 - 18:00"
-        ? null
-        : orderThirdPart,
-    fourthPeriodAdditional:
-      !orderFourthPart || orderFourthPart === "18:00 - 22:00"
-        ? null
-        : orderFourthPart,
+    firstPeriod: !Boolean(firstPeriod),
+    secondPeriod: !Boolean(secondPeriod),
+    thirdPeriod: !Boolean(thirdPeriod),
+    fourthPeriod: !Boolean(fourthPeriod),
+    firstPeriodAdditional: getAdditionalPeriod(firstPeriod, "06:00 - 10:00"),
+    secondPeriodAdditional: getAdditionalPeriod(secondPeriod, "10:00 - 14:00"),
+    thirdPeriodAdditional: getAdditionalPeriod(thirdPeriod, "14:00 - 18:00"),
+    fourthPeriodAdditional: getAdditionalPeriod(fourthPeriod, "18:00 - 22:00"),
   };
 };
 
@@ -170,6 +153,10 @@ const getUpdatedScheduleDetailsForEdit = (existingSchedule, scheduleParts) => {
     updatedSecondPeriodAdditional,
     updatedThirdPeriodAdditional,
     updatedFourthPeriodAdditional,
+    !scheduleParts.firstPeriod,
+    !scheduleParts.secondPeriod,
+    !scheduleParts.thirdPeriod,
+    !scheduleParts.fourthPeriod,
   ];
 };
 
@@ -216,6 +203,14 @@ const getUpdatedScheduleDetailsForDelete = (
     updatedSecondPeriodAdditional,
     updatedThirdPeriodAdditional,
     updatedFourthPeriodAdditional,
+    !scheduleParts.firstPeriod ? false : existingSchedule.is_first_period_order,
+    !scheduleParts.secondPeriod
+      ? false
+      : existingSchedule.is_second_period_order,
+    !scheduleParts.thirdPeriod ? false : existingSchedule.is_third_period_order,
+    !scheduleParts.fourthPeriod
+      ? false
+      : existingSchedule.is_fourth_period_order,
   ];
 };
 

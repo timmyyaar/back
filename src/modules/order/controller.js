@@ -1,11 +1,17 @@
 const { Client } = require("pg");
 const nodemailer = require("nodemailer");
+const schedule = require("node-schedule");
 
-const { getUpdatedUserRating } = require("../../utils");
+const {
+  getUpdatedUserRating,
+  getDateTimeString,
+  getDateTimeObjectFromString,
+} = require("../../utils");
 const { getEmailHtmlTemplate } = require("./emailHtmlTemplate");
 const {
   getConfirmationEmailHtmlTemplate,
 } = require("./confirmationEmailHtmlTemplate");
+const { getReminderEmailHtmlTemplate } = require("./remindEmailHtmlTemplate");
 
 const env = require("../../helpers/environments");
 
@@ -39,6 +45,7 @@ const {
   ORDER_STATUS,
   emailSubjectTranslation,
   confirmationEmailSubjectTranslation,
+  getReminderEmailSubjectTranslation,
 } = require("./constants");
 
 const sendTelegramMessage = async (date, channel, title) => {
@@ -55,6 +62,39 @@ const sendTelegramMessage = async (date, channel, title) => {
   );
 };
 
+const scheduleReminder = (date, order) => {
+  const previousJob = schedule.scheduledJobs[order.email];
+  previousJob?.cancel();
+
+  const rule = new schedule.RecurrenceRule();
+  rule.month = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  rule.date = date.getDate();
+  rule.hour = date.getHours();
+  rule.minute = date.getMinutes();
+  rule.second = date.getSeconds();
+
+  schedule.scheduleJob(order.email, rule, () => {
+    transporter.sendMail({
+      from: "tytfeedback@gmail.com",
+      to: order.email,
+      subject: getReminderEmailSubjectTranslation(order.name)[order.language],
+      html: getReminderEmailHtmlTemplate(order.language, order.name),
+      attachments: [
+        {
+          filename: "logo.png",
+          path: __dirname + "/images/logo.png",
+          cid: "logo@nodemailer.com",
+        },
+        {
+          filename: "bubbles.png",
+          path: __dirname + "/images/bubbles.png",
+          cid: "bubbles@nodemailer.com",
+        },
+      ],
+    });
+  });
+};
+
 const OrderController = () => {
   const getClient = () => {
     const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
@@ -64,6 +104,25 @@ const OrderController = () => {
 
     return client;
   };
+
+  const reScheduleReminders = async () => {
+    const client = getClient();
+
+    await client.connect();
+
+    const remindersQuery = await client.query("SELECT * FROM reminders");
+    const reminders = remindersQuery.rows;
+
+    reminders.forEach((row) => {
+      const date = getDateTimeObjectFromString(row.date);
+
+      scheduleReminder(date, row);
+    });
+
+    await client.end();
+  };
+
+  reScheduleReminders();
 
   const getOrder = async (req, res) => {
     const client = getClient();
@@ -118,7 +177,6 @@ const OrderController = () => {
 
   const createOrder = async (req, res) => {
     const client = getClient();
-
     try {
       const {
         name,
@@ -331,7 +389,6 @@ const OrderController = () => {
         return res.status(422).json({ message: "Unprocessable Entity" });
       }
     } catch (error) {
-      console.log(error);
       return res.status(500).json({ error });
     } finally {
       await client.end();
@@ -443,10 +500,6 @@ const OrderController = () => {
                       existingSchedule,
                       scheduleParts
                     ),
-                    !scheduleParts.firstPeriod,
-                    !scheduleParts.secondPeriod,
-                    !scheduleParts.thirdPeriod,
-                    !scheduleParts.fourthPeriod,
                   ]
                 );
               } else {
@@ -505,18 +558,6 @@ const OrderController = () => {
                       existingSchedule,
                       scheduleParts
                     ),
-                    scheduleParts.firstPeriod
-                      ? false
-                      : existingSchedule.is_first_period_order,
-                    scheduleParts.secondPeriod
-                      ? false
-                      : existingSchedule.is_second_period_order,
-                    scheduleParts.thirdPeriod
-                      ? false
-                      : existingSchedule.is_third_period_order,
-                    scheduleParts.fourthPeriod
-                      ? false
-                      : existingSchedule.is_fourth_period_order,
                   ]
                 );
               }
@@ -676,10 +717,6 @@ const OrderController = () => {
               existingSchedule,
               scheduleParts
             ),
-            !scheduleParts.firstPeriod,
-            !scheduleParts.secondPeriod,
-            !scheduleParts.thirdPeriod,
-            !scheduleParts.fourthPeriod,
           ]
         );
       } else {
@@ -845,29 +882,60 @@ const OrderController = () => {
         }
       }
 
-      if (
-        status === ORDER_STATUS.DONE &&
-        updatedOrder.feedback_link_id &&
-        (!connectedOrder || connectedOrder.status === ORDER_STATUS.DONE)
-      ) {
-        await transporter.sendMail({
-          from: "tytfeedback@gmail.com",
-          to: updatedOrder.email,
-          subject: emailSubjectTranslation[updatedOrder.language],
-          html: getEmailHtmlTemplate(updatedOrder),
-          attachments: [
-            {
-              filename: "logo.png",
-              path: __dirname + "/images/logo.png",
-              cid: "logo@nodemailer.com",
-            },
-            {
-              filename: "bubbles.png",
-              path: __dirname + "/images/bubbles.png",
-              cid: "bubbles@nodemailer.com",
-            },
-          ],
-        });
+      if (status === ORDER_STATUS.DONE) {
+        const sendFeedbackLink =
+          updatedOrder.feedback_link_id &&
+          (!connectedOrder || connectedOrder.status === ORDER_STATUS.DONE);
+
+        if (sendFeedbackLink) {
+          await transporter.sendMail({
+            from: "tytfeedback@gmail.com",
+            to: updatedOrder.email,
+            subject: emailSubjectTranslation[updatedOrder.language],
+            html: getEmailHtmlTemplate(updatedOrder),
+            attachments: [
+              {
+                filename: "logo.png",
+                path: __dirname + "/images/logo.png",
+                cid: "logo@nodemailer.com",
+              },
+              {
+                filename: "bubbles.png",
+                path: __dirname + "/images/bubbles.png",
+                cid: "bubbles@nodemailer.com",
+              },
+            ],
+          });
+        }
+
+        const existingReminderQuery = await client.query(
+          "SELECT * FROM reminders WHERE email = $1",
+          [updatedOrder.email]
+        );
+        const existingReminder = existingReminderQuery.rows[0];
+        const nextReminderDate = new Date(
+          new Date().setMinutes(new Date().getMinutes() - 1)
+        );
+        const dateInMonth = getDateTimeString(nextReminderDate);
+
+        if (existingReminder) {
+          await client.query("UPDATE reminders SET date = $2 WHERE id = $1", [
+            existingReminder.id,
+            dateInMonth,
+          ]);
+        } else {
+          await client.query(
+            "INSERT INTO reminders(email, date, language, name) VALUES($1, $2, $3, $4)",
+            [
+              updatedOrder.email,
+              dateInMonth,
+              updatedOrder.language,
+              updatedOrder.name,
+            ]
+          );
+        }
+
+        scheduleReminder(nextReminderDate, updatedOrder);
       }
 
       const updatedOrderCleanerId = updatedOrder.cleaner_id
@@ -1087,18 +1155,6 @@ const OrderController = () => {
               existingSchedule,
               scheduleParts
             ),
-            scheduleParts.firstPeriod
-              ? false
-              : existingSchedule.is_first_period_order,
-            scheduleParts.secondPeriod
-              ? false
-              : existingSchedule.is_second_period_order,
-            scheduleParts.thirdPeriod
-              ? false
-              : existingSchedule.is_third_period_order,
-            scheduleParts.fourthPeriod
-              ? false
-              : existingSchedule.is_fourth_period_order,
           ]
         );
       }
@@ -1138,7 +1194,6 @@ const OrderController = () => {
         cleaner_id: updatedOrderCleanerId.map((item) => +item),
       });
     } catch (error) {
-      console.log(error);
       return res.status(500).json({ error });
     } finally {
       await client.end();
