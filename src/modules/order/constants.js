@@ -28,6 +28,13 @@ const confirmationEmailSubjectTranslation = {
   ua: "Призначено прибирання!",
 };
 
+const getReminderEmailSubjectTranslation = (name) => ({
+  en: `We miss you, ${name}! Time for another meeting?`,
+  pl: `Tęsknimy za Tobą, ${name}! Czas na kolejne spotkanie?`,
+  ru: `Мы скучаем по вам ${name}! Пора встретиться снова?`,
+  ua: `Ми сумували за вами, ${name}! Час для наступної зустрічі?`,
+});
+
 const emailTranslations = {
   en: {
     dear_client: "Dear",
@@ -51,6 +58,14 @@ ${
     : ""
 }
 We are confident that you will be pleased with our work. Our team is ready to go and looks forward to meeting you at the appointed time`,
+    if_the_apartment_is_too_dirty: '📌 If the apartment is too dirty, the price may change. Please be aware of such cases in advance. We kindly ask you to respect the efforts of our employees, they strive to serve you.',
+    reminder_hope_email:
+      "We hope this email finds you in wonderful spirits! We would like to reminisce about our last meeting, which took place a month ago 😇 It feels like it was just yesterday when we had the pleasure of being in your home and making it shine. ",
+    reminder_we_always_strive:
+      "We always strive to make your experience with us exceptional. Your satisfaction is our top priority, and we take pride in having you as part of our client family.",
+    reminder_dont_forget:
+      "Don't forget that we are always available and ready to assist. We would be delighted to see you again and make your home clean and cozy.",
+    reminder_best_regards: "Best Regards, Take Your Time 💙",
   },
   pl: {
     dear_client: "Szanowni",
@@ -74,6 +89,14 @@ ${
     : ""
 }
 Jesteśmy pewni, że będą Państwo zadowoleni z naszej pracy. Nasz zespół jest gotowy do działania i czeka na spotkanie z Państwem o wyznaczonej godzinie.`,
+    if_the_apartment_is_too_dirty: 'Jeśli mieszkanie jest zbyt brudne, cena może się zmienić. Prosimy o wcześniejsze poinformowanie o takich przypadkach. Prosimy o szacunek dla pracy naszych pracowników, oni starają się dla Was',
+    reminder_hope_email:
+      "Mamy nadzieję, że ten e-mail znajdzie Cię we wspaniałym nastroju! Chcielibyśmy przypomnieć nasze ostatnie spotkanie, które odbyło się miesiąc temu 😇 Wydaje się, że to było wczoraj, kiedy mieliśmy przyjemność być w Twoim domu i sprawić, że lśnił. ",
+    reminder_we_always_strive:
+      "Zawsze staramy się, aby Twój kontakt z nami był wyjątkowy. Twoje zadowolenie jest naszym najwyższym priorytetem, i jesteśmy dumni, że jesteś częścią naszej rodziny klientów.",
+    reminder_dont_forget:
+      "Pamiętaj, że zawsze jesteśmy dostępni i gotowi do pomocy. Będziemy bardzo szczęśliwi, jeśli zobaczymy Cię ponownie i uczynimy Twój dom czystym i przytulnym.",
+    reminder_best_regards: "Z poważaniem, Take Your Time 💙",
   },
   ru: {
     dear_client: "Дорогой",
@@ -98,6 +121,14 @@ ${
     : ""
 }
 Мы уверены, что вы останетесь довольны нашей работой. Наша команда готова к работе и ждет встречи с вами в указанное время.`,
+    if_the_apartment_is_too_dirty: 'Если в квартире слишком грязно, цена может измениться, о подобных случаях стоит предупреждать заранее, мы просим уважать труд наших сотрудников, они стараются для вас',
+    reminder_hope_email:
+      "Надеемся, что это письмо обнаружит вас в прекрасном настроении! Мы хотели бы вспомнить о нашей последней встрече, которая произошла месяц назад 😇 Кажется, что это было только вчера, когда мы имели удовольствие быть в вашем доме и сделать его сияющим. ",
+    reminder_we_always_strive:
+      "Мы всегда стремимся к тому, чтобы ваш опыт работы с нами был неповторимым. Ваше удовлетворение является нашим главным приоритетом, и мы гордимся тем, что вы являетесь частью нашей семьи клиентов.",
+    reminder_dont_forget:
+      "Не забудьте, что мы всегда на связи и готовы прийти на помощь. Мы будем очень рады видеть вас снова и сделать ваш дом чистым и уютнымю.",
+    reminder_best_regards: "С наилучшими пожеланиями, Take Your Time 💙",
   },
   ua: {
     dear_client: "Шановн(а/ий)",
@@ -122,6 +153,14 @@ ${
     : ""
 }
 Ми впевнені, що ви залишитесь задоволені нашою роботою. Наша команда готова до роботи і чекає на зустріч з вами у вказаний час.`,
+    if_the_apartment_is_too_dirty: 'Якщо квартира занадто брудна, ціна може змінитися. Про подібні випадки варто попередити заздалегідь. Прохання поважати працю наших працівників, вони стараються для вас.',
+    reminder_hope_email:
+      "Сподіваємось, що цей лист знайде вас у чудовому настрої! Ми хочемо згадати нашу останню зустріч, яка відбулася місяць тому 😇 Здається, що це було вчора, коли ми мали приємність бути в вашому домі і зробити його сяючим.",
+    reminder_we_always_strive:
+      "Ми завжди прагнемо, щоб ваш досвід з нами був неперевершеним. Ваше задоволення - наш головний пріоритет, і ми пишаємося тим, що ви є частиною нашої клієнтської сім'ї.",
+    reminder_dont_forget:
+      "Не забувайте, що ми завжди на зв'язку і готові прийти на допомогу. Ми будемо дуже раді бачити вас знову і зробити ваш дім чистим і затишним.",
+    reminder_best_regards: "З найкращими побажаннями, Take Your Time 💙",
   },
 };
 
@@ -134,4 +173,5 @@ module.exports = {
   emailTranslations,
   emailSubjectTranslation,
   confirmationEmailSubjectTranslation,
+  getReminderEmailSubjectTranslation,
 };

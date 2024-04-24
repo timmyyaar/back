@@ -1,7 +1,7 @@
 const { emailTranslations } = require("./constants");
 
-const getEmailHtmlTemplate = (updatedOrder) => {
-  const t = emailTranslations[updatedOrder.language];
+const getReminderEmailHtmlTemplate = (language, name) => {
+  const t = emailTranslations[language];
 
   return `<div style="padding: 24px; font-size: 16px;">
                     <head>
@@ -13,7 +13,7 @@ const getEmailHtmlTemplate = (updatedOrder) => {
                                 padding: 20px 120px;
                                 color: #ffffff !important;
                                 border-radius: 40px;
-                                background: #2B8AFC;
+                                background: #4B6BF7;
                                 font-weight: 600;
                                 text-decoration: none !important;
                             }
@@ -53,16 +53,14 @@ const getEmailHtmlTemplate = (updatedOrder) => {
                         <img src="cid:bubbles@nodemailer.com" alt="" style="margin-left: auto;"/>
                     </div>
                     <div style="font-size: 18px; line-height: 22px; font-weight: 600; margin-bottom: 24px; margin-top: 24px; color: black;">
-                        ${t.dear_client} ${updatedOrder.name},  
+                        ${t.dear_client} ${name},  
                     </div>
                     <div>
-                        <p style="color: black;">${t.hope_email}</p>
-                        <p style="color: black;">${t.express_gratitude}</p>
-                        <p style="color: black;">${t.spare_moments}</p>
-                        <p style="color: black;"><span style="font-weight: 600;">${t.click_link_google}</span> <a href="https://g.page/r/CW4tBwhrljwjEBI/review" target="_blank">https://g.page/r/CW4tBwhrljwjEBI/review </a></p>
-                        <p style="color: black;"><span style="font-weight: 600;">${t.review_cleaners}</span> <a href="https://www.takeutime.pl/feedback?orders=${updatedOrder.feedback_link_id}" target="_blank">https://www.takeutime.pl/order/feedback?orders=${updatedOrder.feedback_link_id}</a></p>
-                        <p style="color: black;">${t.thank_you_again}</p>
-                        <p style="color: black;">${t.warm_regards}</p>
+                        <p style="color: black;">${t.reminder_hope_email}</p>
+                        <p style="color: black;">${t.reminder_we_always_strive}</p>
+                        <p style="color: black;">${t.reminder_dont_forget}</p>
+                        <p style="color: black;">${t.reminder_best_regards}</p>
+                        <p style="padding: 22px 0; color: black;"><a class="button" href="https://www.takeutime.pl/" target="_blank">Order cleaning</a></p>
                         <div style="margin-top: 36px">
                             <div style="color: black;">
                                 <span style="font-weight: 600;">Web-page: </span><a href="https://www.takeutime.pl/" target="_blank">https://www.takeutime.pl/</a>
@@ -82,5 +80,5 @@ const getEmailHtmlTemplate = (updatedOrder) => {
 };
 
 module.exports = {
-  getEmailHtmlTemplate,
+  getReminderEmailHtmlTemplate,
 };
