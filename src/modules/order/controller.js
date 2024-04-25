@@ -320,7 +320,7 @@ const OrderController = () => {
             ]
           );
 
-          if (env.getEnvironment("MODE") !== "dev") {
+          if (env.getEnvironment("MODE") === "prod") {
             await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
           }
 
@@ -374,7 +374,7 @@ const OrderController = () => {
             ]
           );
 
-          if (env.getEnvironment("MODE") !== "dev") {
+          if (env.getEnvironment("MODE") === "prod") {
             await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
           }
 
@@ -871,7 +871,7 @@ const OrderController = () => {
           });
         }
 
-        if (env.getEnvironment("MODE") !== "dev") {
+        if (env.getEnvironment("MODE") === "prod") {
           await sendTelegramMessage(
             updatedOrder.date,
             isDryOrOzonation
