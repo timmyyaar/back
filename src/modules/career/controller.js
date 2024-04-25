@@ -2,6 +2,8 @@ const { Client } = require("pg");
 
 const env = require("../../helpers/environments");
 
+const constants = require("../../constants");
+
 const CareersController = () => {
   const getClient = () => {
     const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
@@ -13,15 +15,21 @@ const CareersController = () => {
   };
 
   const getCareers = async (req, res) => {
+    if (req.role !== constants.ROLES.ADMIN) {
+      return res
+        .status(403)
+        .json({ message: "You don't have access to this!" });
+    }
+
     const client = getClient();
 
     try {
       await client.connect();
       const result = await client.query("SELECT * FROM careers");
 
-      res.json({ careers: result.rows });
+      return res.json(result.rows);
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
@@ -52,10 +60,16 @@ const CareersController = () => {
   };
 
   const deleteCareers = async (req, res) => {
+    if (req.role !== constants.ROLES.ADMIN) {
+      return res
+        .status(403)
+        .json({ message: "You don't have access to this!" });
+    }
+
     const client = getClient();
 
     try {
-      const { id } = req.body;
+      const { id } = req.params;
 
       await client.connect();
 
@@ -64,11 +78,11 @@ const CareersController = () => {
         [id]
       );
 
-      res
+      return res
         .status(200)
         .json({ message: "Careers deleted", careers: result.rows });
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
