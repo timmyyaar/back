@@ -570,18 +570,23 @@ const OrderController = () => {
         }
       }
 
-      const updatedOrder = result.rows[0];
+      const updatedOrder = {...result.rows[0]};
       const cleaner_id = updatedOrder.cleaner_id
         ? updatedOrder.cleaner_id.split(",")
         : [];
 
       if (isApprovedStatus && !existingOrder.is_confirmed) {
-        await stripe.paymentIntents.capture(existingOrder.payment_intent);
+        if (existingOrder.payment_intent) {
+          await stripe.paymentIntents.capture(existingOrder.payment_intent);
 
-        await client.query(
-          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-          [id, PAYMENT_STATUS.CONFIRMED]
-        );
+          const updatedOrderPaidQuery = await client.query(
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+            [id, PAYMENT_STATUS.CONFIRMED]
+          );
+          const updatedOrderPaid = updatedOrderPaidQuery.rows[0];
+
+          updatedOrder.payment_status = updatedOrderPaid.payment_status;
+        }
 
         const localesQuery = await client.query("SELECT * FROM locales");
         const locales = localesQuery.rows;
@@ -845,7 +850,7 @@ const OrderController = () => {
         );
       }
 
-      const updatedOrder = result.rows[0];
+      const updatedOrder = { ...result.rows[0] };
 
       if (status === ORDER_STATUS.APPROVED) {
         const isDryOrOzonation = [
@@ -854,12 +859,17 @@ const OrderController = () => {
         ].includes(updatedOrder.title);
 
         if (!existingOrder.is_confirmed) {
-          await stripe.paymentIntents.capture(existingOrder.payment_intent);
+          if (existingOrder.payment_intent) {
+            await stripe.paymentIntents.capture(existingOrder.payment_intent);
 
-          await client.query(
-            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [id, PAYMENT_STATUS.CONFIRMED]
-          );
+            const updatedOrderPaidQuery = await client.query(
+              'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+              [id, PAYMENT_STATUS.CONFIRMED]
+            );
+            const updatedOrderPaid = updatedOrderPaidQuery.rows[0];
+
+            updatedOrder.payment_status = updatedOrderPaid.payment_status;
+          }
 
           const localesQuery = await client.query("SELECT * FROM locales");
           const locales = localesQuery.rows;
