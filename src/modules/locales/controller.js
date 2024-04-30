@@ -21,9 +21,9 @@ const LocalesController = () => {
       await client.connect();
       const result = await client.query("SELECT * FROM locales");
 
-      res.json({ locales: result.rows });
+      return res.json({ locales: result.rows });
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
