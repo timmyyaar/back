@@ -28,9 +28,17 @@ const ORDER_TYPES = {
   WINDOW: "Window cleaning",
 };
 
+const PAYMENT_STATUS = {
+  PENDING: "pending",
+  WAITING_FOR_CONFIRMATION: "waiting_for_confirmation",
+  FAILED: "failed",
+  CONFIRMED: "confirmed",
+};
+
 module.exports = {
   EMAIL_REGEX,
   BRACKETS_REGEX,
   ROLES,
   ORDER_TYPES,
+  PAYMENT_STATUS,
 };

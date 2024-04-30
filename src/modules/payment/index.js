@@ -2,10 +2,14 @@ const { Router } = require("express");
 
 const paymentController = require("./controller");
 
+const { verifyToken } = require("../../middlewares");
+
 const paymentRouter = new Router();
 
 paymentRouter
-  .post("/create-transaction", paymentController.createTransaction)
-  .post("/receive-notification", paymentController.receiveNotification);
+  .post("/payment-intent", paymentController.createPaymentIntent)
+  .patch("/payment-intent/:id", paymentController.updatePaymentIntent)
+  .delete("/payment-intent/:id", paymentController.cancelPaymentIntent)
+  .post("/capture-payment/:id", verifyToken, paymentController.capturePayment);
 
 module.exports = paymentRouter;

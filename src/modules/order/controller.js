@@ -2,6 +2,10 @@ const { Client } = require("pg");
 const nodemailer = require("nodemailer");
 const schedule = require("node-schedule");
 
+const env = require("../../helpers/environments");
+
+const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
+
 const {
   getUpdatedUserRating,
   getDateTimeString,
@@ -13,9 +17,7 @@ const {
 } = require("./confirmationEmailHtmlTemplate");
 const { getReminderEmailHtmlTemplate } = require("./remindEmailHtmlTemplate");
 
-const env = require("../../helpers/environments");
-
-const { ORDER_TYPES } = require("../../constants");
+const { ORDER_TYPES, ROLES, PAYMENT_STATUS } = require("../../constants");
 
 const { getCleanerReward } = require("./price-utils");
 
@@ -133,7 +135,7 @@ const OrderController = () => {
         'SELECT * FROM "order" ORDER BY id DESC'
       );
 
-      res.json(
+      return res.json(
         result.rows.map((item) => {
           const cleaner_id = item.cleaner_id ? item.cleaner_id.split(",") : [];
 
@@ -141,7 +143,7 @@ const OrderController = () => {
         })
       );
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
@@ -222,7 +224,7 @@ const OrderController = () => {
           );
 
           if (isPromoUsed.rows[0]) {
-            return res.status(409).send("Promo already used!");
+            return res.status(409).send({ message: "Promo already used!" });
           }
 
           const existingPromoQuery = await client.query(
@@ -266,10 +268,10 @@ const OrderController = () => {
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
               is_new_client, city, transportation_price, cleaners_count, language, 
-              creation_date, own_check_list, reward_original) 
+              creation_date, own_check_list, reward_original, payment_status) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35) RETURNING *`,
             [
               name,
               number,
@@ -317,6 +319,7 @@ const OrderController = () => {
                 estimate: secondServiceEstimate,
                 price: secondServicePrice,
               }),
+              onlinePayment ? PAYMENT_STATUS.PENDING : null,
             ]
           );
 
@@ -335,9 +338,9 @@ const OrderController = () => {
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
              is_new_client, city, transportation_price, cleaners_count, language, 
-             creation_date, own_check_list, reward_original) 
+             creation_date, own_check_list, reward_original, payment_status) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27) RETURNING *`,
             [
               name,
               number,
@@ -371,6 +374,7 @@ const OrderController = () => {
                 estimate: mainServiceEstimate,
                 price: mainServicePrice,
               }),
+              onlinePayment ? PAYMENT_STATUS.PENDING : null,
             ]
           );
 
@@ -572,6 +576,13 @@ const OrderController = () => {
         : [];
 
       if (isApprovedStatus && !existingOrder.is_confirmed) {
+        await stripe.paymentIntents.capture(existingOrder.payment_intent);
+
+        await client.query(
+          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+          [id, PAYMENT_STATUS.CONFIRMED]
+        );
+
         const localesQuery = await client.query("SELECT * FROM locales");
         const locales = localesQuery.rows;
         const currentLanguageLocales = locales
@@ -763,6 +774,14 @@ const OrderController = () => {
       const id = req.params.id;
       const status = req.params.status;
 
+      const isAdmin = req.role === ROLES.ADMIN;
+
+      if (status === ORDER_STATUS.APPROVED && !isAdmin) {
+        return res
+          .status(403)
+          .json({ message: "You don't have access to this!" });
+      }
+
       const { checkList } = req.body;
 
       await client.connect();
@@ -835,6 +854,13 @@ const OrderController = () => {
         ].includes(updatedOrder.title);
 
         if (!existingOrder.is_confirmed) {
+          await stripe.paymentIntents.capture(existingOrder.payment_intent);
+
+          await client.query(
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+            [id, PAYMENT_STATUS.CONFIRMED]
+          );
+
           const localesQuery = await client.query("SELECT * FROM locales");
           const locales = localesQuery.rows;
           const currentLanguageLocales = locales
