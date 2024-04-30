@@ -4,6 +4,8 @@ const express = require("express");
 const logger = require("morgan");
 const path = require("path");
 
+const { stripeWebhook } = require("./webhooks/stripe-webhook");
+
 require("dotenv").config();
 
 const router = require("./router");
@@ -11,6 +13,7 @@ const router = require("./router");
 const app = express();
 
 app.use(logger("dev"));
+app.post("/stripe-webhook", express.raw({ type: "application/json" }), stripeWebhook);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
