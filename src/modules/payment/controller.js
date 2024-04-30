@@ -25,11 +25,12 @@ const PaymentController = () => {
 
   const updatePaymentIntent = async (req, res) => {
     const { id } = req.params;
-    const { metadata } = req.body;
+    const { metadata, description = "" } = req.body;
 
     try {
       await stripe.paymentIntents.update(id, {
         metadata,
+        description,
       });
 
       return res.status(200).json({
