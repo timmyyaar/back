@@ -570,7 +570,7 @@ const OrderController = () => {
         }
       }
 
-      const updatedOrder = {...result.rows[0]};
+      const updatedOrder = { ...result.rows[0] };
       const cleaner_id = updatedOrder.cleaner_id
         ? updatedOrder.cleaner_id.split(",")
         : [];
@@ -972,6 +972,24 @@ const OrderController = () => {
         }
 
         scheduleReminder(nextReminderDate, updatedOrder);
+      }
+
+      const needToCancelPayment =
+        status === ORDER_STATUS.CLOSED &&
+        updatedOrder.payment_status ===
+          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION &&
+        updatedOrder.payment_intent;
+
+      if (needToCancelPayment) {
+        await stripe.paymentIntents.cancel(updatedOrder.payment_intent);
+
+        const updatedOrderCanceledQuery = await client.query(
+          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+          [id, PAYMENT_STATUS.CANCELED]
+        );
+        const updatedOrderCanceled = updatedOrderCanceledQuery.rows[0];
+
+        updatedOrder.payment_status = updatedOrderCanceled.payment_status;
       }
 
       const updatedOrderCleanerId = updatedOrder.cleaner_id

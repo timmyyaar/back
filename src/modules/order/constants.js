@@ -8,6 +8,7 @@ const ORDER_STATUS = {
   APPROVED: "approved",
   IN_PROGRESS: "in-progress",
   DONE: "done",
+  CLOSED: "closed",
 };
 
 const CREATED_ORDERS_CHANNEL_ID = "-1002017671793";
@@ -58,7 +59,8 @@ ${
     : ""
 }
 We are confident that you will be pleased with our work. Our team is ready to go and looks forward to meeting you at the appointed time`,
-    if_the_apartment_is_too_dirty: '📌 If the apartment is too dirty, the price may change. Please be aware of such cases in advance. We kindly ask you to respect the efforts of our employees, they strive to serve you.',
+    if_the_apartment_is_too_dirty:
+      "📌 If the apartment is too dirty, the price may change. Please be aware of such cases in advance. We kindly ask you to respect the efforts of our employees, they strive to serve you.",
     reminder_hope_email:
       "We hope this email finds you in wonderful spirits! We would like to reminisce about our last meeting, which took place a month ago 😇 It feels like it was just yesterday when we had the pleasure of being in your home and making it shine. ",
     reminder_we_always_strive:
@@ -89,7 +91,8 @@ ${
     : ""
 }
 Jesteśmy pewni, że będą Państwo zadowoleni z naszej pracy. Nasz zespół jest gotowy do działania i czeka na spotkanie z Państwem o wyznaczonej godzinie.`,
-    if_the_apartment_is_too_dirty: 'Jeśli mieszkanie jest zbyt brudne, cena może się zmienić. Prosimy o wcześniejsze poinformowanie o takich przypadkach. Prosimy o szacunek dla pracy naszych pracowników, oni starają się dla Was',
+    if_the_apartment_is_too_dirty:
+      "Jeśli mieszkanie jest zbyt brudne, cena może się zmienić. Prosimy o wcześniejsze poinformowanie o takich przypadkach. Prosimy o szacunek dla pracy naszych pracowników, oni starają się dla Was",
     reminder_hope_email:
       "Mamy nadzieję, że ten e-mail znajdzie Cię we wspaniałym nastroju! Chcielibyśmy przypomnieć nasze ostatnie spotkanie, które odbyło się miesiąc temu 😇 Wydaje się, że to było wczoraj, kiedy mieliśmy przyjemność być w Twoim domu i sprawić, że lśnił. ",
     reminder_we_always_strive:
@@ -121,7 +124,8 @@ ${
     : ""
 }
 Мы уверены, что вы останетесь довольны нашей работой. Наша команда готова к работе и ждет встречи с вами в указанное время.`,
-    if_the_apartment_is_too_dirty: 'Если в квартире слишком грязно, цена может измениться, о подобных случаях стоит предупреждать заранее, мы просим уважать труд наших сотрудников, они стараются для вас',
+    if_the_apartment_is_too_dirty:
+      "Если в квартире слишком грязно, цена может измениться, о подобных случаях стоит предупреждать заранее, мы просим уважать труд наших сотрудников, они стараются для вас",
     reminder_hope_email:
       "Надеемся, что это письмо обнаружит вас в прекрасном настроении! Мы хотели бы вспомнить о нашей последней встрече, которая произошла месяц назад 😇 Кажется, что это было только вчера, когда мы имели удовольствие быть в вашем доме и сделать его сияющим. ",
     reminder_we_always_strive:
@@ -153,7 +157,8 @@ ${
     : ""
 }
 Ми впевнені, що ви залишитесь задоволені нашою роботою. Наша команда готова до роботи і чекає на зустріч з вами у вказаний час.`,
-    if_the_apartment_is_too_dirty: 'Якщо квартира занадто брудна, ціна може змінитися. Про подібні випадки варто попередити заздалегідь. Прохання поважати працю наших працівників, вони стараються для вас.',
+    if_the_apartment_is_too_dirty:
+      "Якщо квартира занадто брудна, ціна може змінитися. Про подібні випадки варто попередити заздалегідь. Прохання поважати працю наших працівників, вони стараються для вас.",
     reminder_hope_email:
       "Сподіваємось, що цей лист знайде вас у чудовому настрої! Ми хочемо згадати нашу останню зустріч, яка відбулася місяць тому 😇 Здається, що це було вчора, коли ми мали приємність бути в вашому домі і зробити його сяючим.",
     reminder_we_always_strive:

@@ -33,6 +33,7 @@ const PAYMENT_STATUS = {
   WAITING_FOR_CONFIRMATION: "waiting_for_confirmation",
   FAILED: "failed",
   CONFIRMED: "confirmed",
+  CANCELED: "canceled",
 };
 
 module.exports = {
