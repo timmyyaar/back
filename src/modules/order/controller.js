@@ -407,6 +407,27 @@ const OrderController = () => {
 
       await client.connect();
 
+      const existingOrderQuery = await client.query(
+        'SELECT * FROM "order" WHERE id = $1',
+        [id]
+      );
+      const existingOrder = existingOrderQuery.rows[0];
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order doesn't exist" });
+      }
+
+      const needToCancelPaymentIntent =
+        existingOrder.payment_intent &&
+        [
+          PAYMENT_STATUS.PENDING,
+          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
+        ].includes(existingOrder.payment_status);
+
+      if (needToCancelPaymentIntent) {
+        await stripe.paymentIntents.cancel(existingOrder.payment_intent);
+      }
+
       await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
 
       res.status(200).json("Order deleted");

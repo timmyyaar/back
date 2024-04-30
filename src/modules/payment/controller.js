@@ -74,11 +74,24 @@ const PaymentController = () => {
     }
   };
 
+  const getPaymentIntent = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(id);
+
+      return res.status(200).json(paymentIntent)
+    } catch (error) {
+      return res.status(404).json({ message: error.raw.message });
+    }
+  };
+
   return {
     createPaymentIntent,
     updatePaymentIntent,
     cancelPaymentIntent,
     capturePayment,
+    getPaymentIntent,
   };
 };
 
