@@ -576,7 +576,12 @@ const OrderController = () => {
         : [];
 
       if (isApprovedStatus && !existingOrder.is_confirmed) {
-        if (existingOrder.payment_intent) {
+        const canApprovePayment =
+          existingOrder.payment_intent &&
+          updatedOrder.payment_status ===
+            PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
+
+        if (canApprovePayment) {
           await stripe.paymentIntents.capture(existingOrder.payment_intent);
 
           const updatedOrderPaidQuery = await client.query(
@@ -859,7 +864,12 @@ const OrderController = () => {
         ].includes(updatedOrder.title);
 
         if (!existingOrder.is_confirmed) {
-          if (existingOrder.payment_intent) {
+          const canApprovePayment =
+            existingOrder.payment_intent &&
+            updatedOrder.payment_status ===
+              PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
+
+          if (canApprovePayment) {
             await stripe.paymentIntents.capture(existingOrder.payment_intent);
 
             const updatedOrderPaidQuery = await client.query(
