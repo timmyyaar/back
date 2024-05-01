@@ -10,6 +10,7 @@ paymentRouter
   .post("/payment-intent", paymentController.createPaymentIntent)
   .patch("/payment-intent/:id", paymentController.updatePaymentIntent)
   .delete("/payment-intent/:id", paymentController.cancelPaymentIntent)
-  .post("/capture-payment/:id", verifyToken, paymentController.capturePayment);
+  .post("/capture-payment/:id", verifyToken, paymentController.capturePayment)
+  .get("/payment-intent/:id", paymentController.getPaymentIntent);
 
 module.exports = paymentRouter;

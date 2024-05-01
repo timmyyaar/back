@@ -54,7 +54,7 @@ const stripeWebhook = async (req, res) => {
               'UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *',
               [
                 id,
-                isPaymentFailed ? null : paymentIntent.id,
+                paymentIntent.id,
                 isPaymentFailed
                   ? PAYMENT_STATUS.FAILED
                   : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
