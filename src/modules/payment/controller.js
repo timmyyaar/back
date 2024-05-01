@@ -5,7 +5,7 @@ const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
 
 const PaymentController = () => {
   const createPaymentIntent = async (req, res) => {
-    const { price, email } = req.body;
+    const { price, email, metadata } = req.body;
 
     try {
       const intent = await stripe.paymentIntents.create({
@@ -13,6 +13,7 @@ const PaymentController = () => {
         currency: "pln",
         capture_method: "manual",
         receipt_email: email,
+        ...(metadata && { metadata }),
       });
 
       return res
@@ -80,7 +81,7 @@ const PaymentController = () => {
     try {
       const paymentIntent = await stripe.paymentIntents.retrieve(id);
 
-      return res.status(200).json(paymentIntent)
+      return res.status(200).json(paymentIntent);
     } catch (error) {
       return res.status(404).json({ message: error.raw.message });
     }
