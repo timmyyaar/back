@@ -212,6 +212,7 @@ const OrderController = () => {
         language,
         creationDate,
         ownCheckList = false,
+        paymentIntentId = null,
       } = req.body;
 
       if (name && number && email && address && date && city) {
@@ -268,10 +269,10 @@ const OrderController = () => {
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
               is_new_client, city, transportation_price, cleaners_count, language, 
-              creation_date, own_check_list, reward_original, payment_status) 
+              creation_date, own_check_list, reward_original, payment_status, payment_intent) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36) RETURNING *`,
             [
               name,
               number,
@@ -320,6 +321,7 @@ const OrderController = () => {
                 price: secondServicePrice,
               }),
               onlinePayment ? PAYMENT_STATUS.PENDING : null,
+              paymentIntentId,
             ]
           );
 
@@ -338,9 +340,9 @@ const OrderController = () => {
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
              is_new_client, city, transportation_price, cleaners_count, language, 
-             creation_date, own_check_list, reward_original, payment_status) 
+             creation_date, own_check_list, reward_original, payment_status, payment_intent) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) RETURNING *`,
             [
               name,
               number,
@@ -375,6 +377,7 @@ const OrderController = () => {
                 price: mainServicePrice,
               }),
               onlinePayment ? PAYMENT_STATUS.PENDING : null,
+              paymentIntentId,
             ]
           );
 
@@ -1285,6 +1288,89 @@ const OrderController = () => {
     }
   };
 
+  const connectPaymentIntent = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const { id } = req.params;
+
+      await client.connect();
+
+      const existingOrderQuery = await client.query(
+        'SELECT * FROM "order" WHERE id = $1',
+        [id]
+      );
+      const existingOrder = existingOrderQuery.rows[0];
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order doesn't exist" });
+      }
+
+      if (existingOrder.payment_intent) {
+        return res.status(409).json({
+          message: "Payment intent is already connected to this order",
+        });
+      }
+
+      try {
+        const connectedOrderQuery = await client.query(
+          `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
+           and address = $4 and name = $5 and creation_date = $6)`,
+          [
+            id,
+            existingOrder.date,
+            existingOrder.number,
+            existingOrder.address,
+            existingOrder.name,
+            existingOrder.creation_date,
+          ]
+        );
+        const connectedOrder = connectedOrderQuery.rows[0];
+
+        const orderIds = connectedOrder
+          ? `${existingOrder.id},${connectedOrder.id}`
+          : `${existingOrder.id}`;
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: existingOrder.price * 100,
+          currency: "pln",
+          capture_method: "manual",
+          receipt_email: existingOrder.email,
+          description: `Customer name: ${existingOrder.name}, Date: ${
+            existingOrder.date
+          }, Service: ${existingOrder.title}${
+            connectedOrder
+              ? `, Second service title: ${connectedOrder.title}`
+              : ""
+          }`,
+          metadata: { orderIds },
+        });
+
+        const updatedOrderQuery = await client.query(
+          `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
+          [id, paymentIntent.id, PAYMENT_STATUS.PENDING]
+        );
+        const updatedOrder = updatedOrderQuery.rows[0];
+        const updatedOrderCleanerId = updatedOrder.cleaner_id
+          ? updatedOrder.cleaner_id.split(",")
+          : [];
+
+        return res.status(200).json({
+          ...updatedOrder,
+          cleaner_id: updatedOrderCleanerId.map((item) => +item),
+        });
+      } catch (error) {
+        return res
+          .status(404)
+          .json({ message: "Payment intent doesn't exist" });
+      }
+    } catch (error) {
+      return res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
   return {
     getOrder,
     getClientOrder,
@@ -1297,6 +1383,7 @@ const OrderController = () => {
     sendFeedback,
     refuseOrder,
     updateOrderExtraExpenses,
+    connectPaymentIntent,
   };
 };
 
