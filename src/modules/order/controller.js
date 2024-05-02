@@ -727,7 +727,7 @@ const OrderController = () => {
         const {
           rows: [updatedConnectedOrder],
         } = await client.query(
-          'UPDATE "order" SET status = $3, payment_status = $4 feedback_link_id = $2 WHERE id = $1 RETURNING *',
+          'UPDATE "order" SET feedback_link_id = $2, status = $3, payment_status = $4 WHERE id = $1 RETURNING *',
           [
             connectedOrder.id,
             updatedConnectedOrderFeedbackLink,
@@ -770,7 +770,7 @@ const OrderController = () => {
         ? [updatedOrder, updatedConnectedOrder]
         : [updatedOrder];
 
-      res.status(200).json(
+      return res.status(200).json(
         updatedOrders.map((item) => ({
           ...item,
           cleaner_id: item.cleaner_id
@@ -779,7 +779,7 @@ const OrderController = () => {
         }))
       );
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
