@@ -1069,7 +1069,28 @@ const OrderController = () => {
 
       await client.connect();
 
-      const result = await client.query(
+      const {
+        rows: [existingOrder],
+      } = await client.query('SELECT * FROM "order" WHERE id = $1', [id]);
+
+      const {
+        rows: [connectedOrder],
+      } = await client.query(
+        `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
+           and address = $4 and name = $5 and creation_date = $6)`,
+        [
+          id,
+          existingOrder.date,
+          existingOrder.number,
+          existingOrder.address,
+          existingOrder.name,
+          existingOrder.creation_date,
+        ]
+      );
+
+      const {
+        rows: [updatedOrder],
+      } = await client.query(
         `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
                date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
                counter = $11, subService = $12, total_service_price = $13,
@@ -1098,15 +1119,30 @@ const OrderController = () => {
         ]
       );
 
-      const updatedOrder = result.rows[0];
-      const updatedOrderCleanerId = updatedOrder.cleaner_id
-        ? updatedOrder.cleaner_id.split(",")
-        : [];
+      const updatedOrdersResult = [{ ...updatedOrder }];
 
-      return res.status(200).json({
-        ...updatedOrder,
-        cleaner_id: updatedOrderCleanerId.map((item) => +item),
-      });
+      if (connectedOrder) {
+        const {
+          rows: [updatedConnectedOrder],
+        } = await client.query(
+          `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
+               date = $6, onlinePayment = $7 WHERE id = $1 RETURNING *`,
+          [connectedOrder.id, name, number, email, address, date, onlinePayment]
+        );
+
+        updatedOrdersResult.push({ ...updatedConnectedOrder });
+      }
+
+      return res
+        .status(200)
+        .json(
+          updatedOrdersResult.map((item) => ({
+            ...item,
+            cleaner_id: item.cleaner_id
+              ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
+              : [],
+          }))
+        );
     } catch (error) {
       return res.status(500).json({ error });
     } finally {
@@ -1296,11 +1332,9 @@ const OrderController = () => {
 
       await client.connect();
 
-      const existingOrderQuery = await client.query(
-        'SELECT * FROM "order" WHERE id = $1',
-        [id]
-      );
-      const existingOrder = existingOrderQuery.rows[0];
+      const {
+        rows: [existingOrder],
+      } = await client.query('SELECT * FROM "order" WHERE id = $1', [id]);
 
       if (!existingOrder) {
         return res.status(404).json({ message: "Order doesn't exist" });
@@ -1313,7 +1347,9 @@ const OrderController = () => {
       }
 
       try {
-        const connectedOrderQuery = await client.query(
+        const {
+          rows: [connectedOrder],
+        } = await client.query(
           `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
            and address = $4 and name = $5 and creation_date = $6)`,
           [
@@ -1325,7 +1361,6 @@ const OrderController = () => {
             existingOrder.creation_date,
           ]
         );
-        const connectedOrder = connectedOrderQuery.rows[0];
 
         const orderIds = connectedOrder
           ? `${existingOrder.id},${connectedOrder.id}`
@@ -1346,19 +1381,34 @@ const OrderController = () => {
           metadata: { orderIds },
         });
 
-        const updatedOrderQuery = await client.query(
+        const {
+          rows: [updatedOrder],
+        } = await client.query(
           `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
           [id, paymentIntent.id, PAYMENT_STATUS.PENDING]
         );
-        const updatedOrder = updatedOrderQuery.rows[0];
-        const updatedOrderCleanerId = updatedOrder.cleaner_id
-          ? updatedOrder.cleaner_id.split(",")
-          : [];
 
-        return res.status(200).json({
-          ...updatedOrder,
-          cleaner_id: updatedOrderCleanerId.map((item) => +item),
-        });
+        const updatedOrdersResult = [{ ...updatedOrder }];
+
+        if (connectedOrder) {
+          const {
+            rows: [updatedConnectedOrder],
+          } = await client.query(
+            `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
+            [connectedOrder.id, paymentIntent.id, PAYMENT_STATUS.PENDING]
+          );
+
+          updatedOrdersResult.push({ ...updatedConnectedOrder });
+        }
+
+        return res.status(200).json(
+          updatedOrdersResult.map((order) => ({
+            ...order,
+            cleaner_id: order.cleaner_id
+              ? order.cleaner_id.split(",").map((item) => +item)
+              : [],
+          }))
+        );
       } catch (error) {
         return res
           .status(404)

@@ -31,7 +31,10 @@ const stripeWebhook = async (req, res) => {
       });
 
       const paymentIntent = event.data.object;
-      const orderIds = paymentIntent.metadata.orderIds?.split(",") || [];
+      const orderIds =
+        paymentIntent.metadata.orderIds
+          ?.split(",")
+          ?.map((orderId) => +orderId) || [];
 
       try {
         await client.connect();
@@ -46,15 +49,14 @@ const stripeWebhook = async (req, res) => {
 
             const existingPaymentIntent = order?.payment_intent;
 
-            if (existingPaymentIntent) {
+            if (!existingPaymentIntent) {
               return Promise.resolve();
             }
 
             await client.query(
-              'UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *',
+              'UPDATE "order" SET payment_status = $3 WHERE id = $1 RETURNING *',
               [
                 id,
-                paymentIntent.id,
                 isPaymentFailed
                   ? PAYMENT_STATUS.FAILED
                   : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
