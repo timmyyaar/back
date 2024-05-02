@@ -402,7 +402,7 @@ const OrderController = () => {
 
       return res
         .status(200)
-        .json(connectedOrder ? [id, connectedOrder.id] : [id]);
+        .json(connectedOrder ? [+id, +connectedOrder.id] : [+id]);
     } catch (error) {
       return res.status(500).json({ error });
     } finally {
