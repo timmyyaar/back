@@ -1367,7 +1367,7 @@ const OrderController = () => {
           : `${existingOrder.id}`;
 
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: existingOrder.price * 100,
+          amount: existingOrder.total_service_price * 100,
           currency: "pln",
           capture_method: "manual",
           receipt_email: existingOrder.email,
