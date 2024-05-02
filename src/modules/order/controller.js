@@ -1088,6 +1088,28 @@ const OrderController = () => {
         ]
       );
 
+      const wasOnlinePaymentChanged =
+        onlinePayment !== existingOrder.onlinepayment;
+
+      if (wasOnlinePaymentChanged && existingOrder.payment_intent) {
+        return res
+          .status(400)
+          .json({ message: "You can't change payment type for paid orders!" });
+      }
+
+      const wasAnyPriceChanged =
+        existingOrder.price !== price ||
+        existingOrder.price_original !== price_original ||
+        existingOrder.total_service_price !== total_service_price ||
+        existingOrder.total_service_price_original !==
+          total_service_price_original;
+
+      if (existingOrder.payment_intent && wasAnyPriceChanged) {
+        return res.status(400).json({
+          message: "You can't change any price for order with payment intent!",
+        });
+      }
+
       const {
         rows: [updatedOrder],
       } = await client.query(
@@ -1095,7 +1117,8 @@ const OrderController = () => {
                date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
                counter = $11, subService = $12, total_service_price = $13,
                total_service_price_original = $14, price_original = $15, creation_date = $16,
-               note = $17, reward = $18, own_check_list = $19 WHERE id = $1 RETURNING *`,
+               note = $17, reward = $18, own_check_list = $19, payment_intent = $20, payment_status = $21
+               WHERE id = $1 RETURNING *`,
         [
           id,
           name,
@@ -1116,6 +1139,8 @@ const OrderController = () => {
           note,
           reward,
           ownCheckList || false,
+          wasOnlinePaymentChanged ? null : existingOrder.payment_intent,
+          wasOnlinePaymentChanged ? null : existingOrder.payment_status,
         ]
       );
 
@@ -1126,23 +1151,31 @@ const OrderController = () => {
           rows: [updatedConnectedOrder],
         } = await client.query(
           `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
-               date = $6, onlinePayment = $7 WHERE id = $1 RETURNING *`,
-          [connectedOrder.id, name, number, email, address, date, onlinePayment]
+               date = $6, onlinePayment = $7, payment_intent = $8, payment_status = $9 WHERE id = $1 RETURNING *`,
+          [
+            connectedOrder.id,
+            name,
+            number,
+            email,
+            address,
+            date,
+            onlinePayment,
+            wasOnlinePaymentChanged ? null : existingOrder.payment_intent,
+            wasOnlinePaymentChanged ? null : existingOrder.payment_status,
+          ]
         );
 
         updatedOrdersResult.push({ ...updatedConnectedOrder });
       }
 
-      return res
-        .status(200)
-        .json(
-          updatedOrdersResult.map((item) => ({
-            ...item,
-            cleaner_id: item.cleaner_id
-              ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
-              : [],
-          }))
-        );
+      return res.status(200).json(
+        updatedOrdersResult.map((item) => ({
+          ...item,
+          cleaner_id: item.cleaner_id
+            ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
+            : [],
+        }))
+      );
     } catch (error) {
       return res.status(500).json({ error });
     } finally {
