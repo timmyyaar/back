@@ -427,11 +427,29 @@ const OrderController = () => {
           PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
         ].includes(existingOrder.payment_status);
 
+      const {
+        rows: [connectedOrder],
+      } = await client.query(
+        `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
+           and address = $4 and name = $5 and creation_date = $6)`,
+        [
+          id,
+          existingOrder.date,
+          existingOrder.number,
+          existingOrder.address,
+          existingOrder.name,
+          existingOrder.creation_date,
+        ]
+      );
+
+      await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
+      await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [
+        connectedOrder.id,
+      ]);
+
       if (needToCancelPaymentIntent) {
         await stripe.paymentIntents.cancel(existingOrder.payment_intent);
       }
-
-      await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
 
       res.status(200).json("Order deleted");
     } catch (error) {
@@ -460,6 +478,16 @@ const OrderController = () => {
         return res.status(404).json({ message: "Order not found" });
       }
 
+      const {
+        rows: [connectedOrderInit],
+      } = await client.query(
+        'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
+        [id, existingOrder.date, existingOrder.number, existingOrder.address]
+      );
+      let connectedOrder = connectedOrderInit
+        ? { ...connectedOrderInit }
+        : null;
+
       const isDryCleaningOrOzonation = [
         ORDER_TYPES.DRY,
         ORDER_TYPES.OZONATION,
@@ -473,14 +501,40 @@ const OrderController = () => {
         ? JSON.stringify(getOrderCheckList(existingOrder))
         : existingOrder.check_list;
 
+      const needToApprovePayment =
+        isApprovedStatus &&
+        !existingOrder.is_confirmed &&
+        existingOrder.payment_intent &&
+        existingOrder.payment_status ===
+          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
+
+      if (needToApprovePayment) {
+        await stripe.paymentIntents.capture(existingOrder.payment_intent);
+
+        if (connectedOrder) {
+          const {
+            rows: [approvedConnectedOrder],
+          } = await client.query(
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
+          );
+
+          connectedOrder = { ...approvedConnectedOrder };
+        }
+      }
+
       const result = await client.query(
-        'UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4, is_confirmed = $5 WHERE id = $1 RETURNING *',
+        `UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4,
+         is_confirmed = $5, payment_status = $6 WHERE id = $1 RETURNING *`,
         [
           id,
           cleanerId.join(","),
           isApprovedStatus ? "approved" : "created",
           updatedCheckList,
           isApprovedStatus ? true : existingOrder.is_confirmed,
+          needToApprovePayment
+            ? PAYMENT_STATUS.CONFIRMED
+            : existingOrder.payment_status,
         ]
       );
 
@@ -595,28 +649,8 @@ const OrderController = () => {
       }
 
       const updatedOrder = { ...result.rows[0] };
-      const cleaner_id = updatedOrder.cleaner_id
-        ? updatedOrder.cleaner_id.split(",")
-        : [];
 
       if (isApprovedStatus && !existingOrder.is_confirmed) {
-        const canApprovePayment =
-          existingOrder.payment_intent &&
-          updatedOrder.payment_status ===
-            PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
-
-        if (canApprovePayment) {
-          await stripe.paymentIntents.capture(existingOrder.payment_intent);
-
-          const updatedOrderPaidQuery = await client.query(
-            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [id, PAYMENT_STATUS.CONFIRMED]
-          );
-          const updatedOrderPaid = updatedOrderPaidQuery.rows[0];
-
-          updatedOrder.payment_status = updatedOrderPaid.payment_status;
-        }
-
         const localesQuery = await client.query("SELECT * FROM locales");
         const locales = localesQuery.rows;
         const currentLanguageLocales = locales
@@ -653,9 +687,20 @@ const OrderController = () => {
         });
       }
 
+      const updatedOrders = connectedOrder
+        ? [updatedOrder, connectedOrder]
+        : [updatedOrder];
+
       return res
         .status(200)
-        .json({ ...updatedOrder, cleaner_id: cleaner_id.map((item) => +item) });
+        .json(
+          updatedOrders.map((item) => ({
+            ...item,
+            cleaner_id: item.cleaner_id
+              ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
+              : [],
+          }))
+        );
     } catch (error) {
       return res.status(500).json({ error });
     } finally {
@@ -830,11 +875,15 @@ const OrderController = () => {
         return res.status(404).json({ message: "Order not found" });
       }
 
-      const connectedOrderQuery = await client.query(
+      const {
+        rows: [connectedOrderInit],
+      } = await client.query(
         'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
         [id, existingOrder.date, existingOrder.number, existingOrder.address]
       );
-      const connectedOrder = connectedOrderQuery.rows[0];
+      let connectedOrder = connectedOrderInit
+        ? { ...connectedOrderInit }
+        : null;
 
       const feedBackLinkId = connectedOrder
         ? [
@@ -859,8 +908,53 @@ const OrderController = () => {
         ? JSON.stringify(getOrderCheckList(existingOrder))
         : existingOrder.check_list;
 
+      const needToCancelPayment =
+        existingOrder.payment_intent &&
+        status === ORDER_STATUS.CLOSED &&
+        [
+          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
+          PAYMENT_STATUS.PENDING,
+        ].includes(existingOrder.payment_status);
+      const needToApprovePayment =
+        status === ORDER_STATUS.APPROVED &&
+        existingOrder.payment_intent &&
+        existingOrder.payment_status ===
+          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION &&
+        !existingOrder.is_confirmed;
+
+      if (needToApprovePayment) {
+        await stripe.paymentIntents.capture(existingOrder.payment_intent);
+
+        if (connectedOrder) {
+          const {
+            rows: [approvedConnectedOrder],
+          } = await client.query(
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
+          );
+
+          connectedOrder = { ...approvedConnectedOrder };
+        }
+      }
+
+      if (needToCancelPayment) {
+        await stripe.paymentIntents.cancel(existingOrder.payment_intent);
+
+        if (connectedOrder) {
+          const {
+            rows: [canceledConnectedOrder],
+          } = await client.query(
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+            [connectedOrder.id, PAYMENT_STATUS.CANCELED]
+          );
+
+          connectedOrder = { ...canceledConnectedOrder };
+        }
+      }
+
       const result = await client.query(
-        'UPDATE "order" SET status = $2, feedback_link_id = $3, check_list = $4, is_confirmed = $5 WHERE id = $1 RETURNING *',
+        `UPDATE "order" SET status = $2, feedback_link_id = $3,
+         check_list = $4, is_confirmed = $5, payment_status = $6 WHERE id = $1 RETURNING *`,
         [
           id,
           status,
@@ -869,14 +963,23 @@ const OrderController = () => {
             : existingOrder.feedback_link_id,
           updatedCheckList,
           status === ORDER_STATUS.APPROVED ? true : existingOrder.is_confirmed,
+          needToCancelPayment
+            ? PAYMENT_STATUS.CANCELED
+            : needToApprovePayment
+            ? PAYMENT_STATUS.CONFIRMED
+            : existingOrder.payment_status,
         ]
       );
 
       if (connectedOrder && status === ORDER_STATUS.IN_PROGRESS) {
-        await client.query(
+        const {
+          rows: [connectedOrderWithFeedback],
+        } = await client.query(
           'UPDATE "order" SET feedback_link_id = $2 WHERE id = $1 RETURNING *',
           [connectedOrder.id, base64Orders]
         );
+
+        connectedOrder = { ...connectedOrderWithFeedback };
       }
 
       const updatedOrder = { ...result.rows[0] };
@@ -888,23 +991,6 @@ const OrderController = () => {
         ].includes(updatedOrder.title);
 
         if (!existingOrder.is_confirmed) {
-          const canApprovePayment =
-            existingOrder.payment_intent &&
-            updatedOrder.payment_status ===
-              PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
-
-          if (canApprovePayment) {
-            await stripe.paymentIntents.capture(existingOrder.payment_intent);
-
-            const updatedOrderPaidQuery = await client.query(
-              'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-              [id, PAYMENT_STATUS.CONFIRMED]
-            );
-            const updatedOrderPaid = updatedOrderPaidQuery.rows[0];
-
-            updatedOrder.payment_status = updatedOrderPaid.payment_status;
-          }
-
           const localesQuery = await client.query("SELECT * FROM locales");
           const locales = localesQuery.rows;
           const currentLanguageLocales = locales
@@ -1008,32 +1094,18 @@ const OrderController = () => {
         scheduleReminder(nextReminderDate, updatedOrder);
       }
 
-      const needToCancelPayment =
-        status === ORDER_STATUS.CLOSED &&
-        updatedOrder.payment_status ===
-          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION &&
-        updatedOrder.payment_intent;
+      const updatedOrders = connectedOrder
+        ? [updatedOrder, connectedOrder]
+        : [updatedOrder];
 
-      if (needToCancelPayment) {
-        await stripe.paymentIntents.cancel(updatedOrder.payment_intent);
-
-        const updatedOrderCanceledQuery = await client.query(
-          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-          [id, PAYMENT_STATUS.CANCELED]
-        );
-        const updatedOrderCanceled = updatedOrderCanceledQuery.rows[0];
-
-        updatedOrder.payment_status = updatedOrderCanceled.payment_status;
-      }
-
-      const updatedOrderCleanerId = updatedOrder.cleaner_id
-        ? updatedOrder.cleaner_id.split(",")
-        : [];
-
-      res.status(200).json({
-        ...updatedOrder,
-        cleaner_id: updatedOrderCleanerId.map((item) => +item),
-      });
+      res.status(200).json(
+        updatedOrders.map((item) => ({
+          ...item,
+          cleaner_id: item.cleaner_id
+            ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
+            : [],
+        }))
+      );
     } catch (error) {
       res.status(500).json({ error });
     } finally {
