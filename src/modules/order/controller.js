@@ -779,7 +779,6 @@ const OrderController = () => {
         }))
       );
     } catch (error) {
-      console.log(error);
       return res.status(500).json({ error });
     } finally {
       await client.end();
