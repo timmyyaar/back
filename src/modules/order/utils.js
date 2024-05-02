@@ -1,3 +1,5 @@
+const env = require("../../helpers/environments");
+
 const { ORDER_TYPES, BRACKETS_REGEX } = require("../../constants");
 const {
   REGULAR_BEDROOM,
@@ -420,9 +422,24 @@ const getOrderCheckList = (order) => {
   }
 };
 
+const sendTelegramMessage = async (date, channel, title) => {
+  await fetch(
+    `https://api.telegram.org/bot${env.getEnvironment(
+      "TELEGRAM_BOT_ID"
+    )}/sendMessage?` +
+      new URLSearchParams({
+        chat_id: channel,
+        text: `New ${title ? `${title} ` : ""}order!\n${date
+          .replaceAll("/", ".")
+          .replace(" ", ", ")}`,
+      })
+  );
+};
+
 module.exports = {
   getSchedulePartsByOrder,
   getUpdatedScheduleDetailsForEdit,
   getUpdatedScheduleDetailsForDelete,
   getOrderCheckList,
+  sendTelegramMessage,
 };

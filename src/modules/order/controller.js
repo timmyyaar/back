@@ -1,6 +1,5 @@
 const { Client } = require("pg");
 const nodemailer = require("nodemailer");
-const schedule = require("node-schedule");
 
 const env = require("../../helpers/environments");
 
@@ -8,25 +7,23 @@ const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
 
 const {
   getUpdatedUserRating,
-  getDateTimeString,
   getDateTimeObjectFromString,
 } = require("../../utils");
-const { getEmailHtmlTemplate } = require("./emailHtmlTemplate");
-const {
-  getConfirmationEmailHtmlTemplate,
-} = require("./confirmationEmailHtmlTemplate");
-const { getReminderEmailHtmlTemplate } = require("./remindEmailHtmlTemplate");
 
 const { ORDER_TYPES, ROLES, PAYMENT_STATUS } = require("../../constants");
 
 const { getCleanerReward } = require("./price-utils");
 
+const { getOrderCheckList, sendTelegramMessage } = require("./utils");
+
 const {
-  getSchedulePartsByOrder,
-  getUpdatedScheduleDetailsForEdit,
-  getUpdatedScheduleDetailsForDelete,
-  getOrderCheckList,
-} = require("./utils");
+  sendConfirmationEmailAndTelegramMessage,
+  scheduleReminder,
+  sendFeedbackEmailAndSetReminder,
+  addOrderToSchedule,
+  removeOrderFromSchedule,
+  updateScheduleForMultipleCleaners,
+} = require("./helpers");
 
 const VACUUM_CLEANER_SUB_SERVICE = "Vacuum_cleaner_sub_service_summery";
 
@@ -41,61 +38,10 @@ const transporter = nodemailer.createTransport({
 
 const {
   CREATED_ORDERS_CHANNEL_ID,
-  APPROVED_DRY_OZONATION_CHANNEL_ID,
-  APPROVED_REGULAR_CHANNEL_ID,
-  ORDER_TITLES,
   ORDER_STATUS,
   emailSubjectTranslation,
-  confirmationEmailSubjectTranslation,
   getReminderEmailSubjectTranslation,
 } = require("./constants");
-
-const sendTelegramMessage = async (date, channel, title) => {
-  await fetch(
-    `https://api.telegram.org/bot${env.getEnvironment(
-      "TELEGRAM_BOT_ID"
-    )}/sendMessage?` +
-      new URLSearchParams({
-        chat_id: channel,
-        text: `New ${title ? `${title} ` : ""}order!\n${date
-          .replaceAll("/", ".")
-          .replace(" ", ", ")}`,
-      })
-  );
-};
-
-const scheduleReminder = (date, order) => {
-  const previousJob = schedule.scheduledJobs[order.email];
-  previousJob?.cancel();
-
-  const rule = new schedule.RecurrenceRule();
-  rule.month = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  rule.date = date.getDate();
-  rule.hour = date.getHours();
-  rule.minute = date.getMinutes();
-  rule.second = date.getSeconds();
-
-  schedule.scheduleJob(order.email, rule, () => {
-    transporter.sendMail({
-      from: "tytfeedback@gmail.com",
-      to: order.email,
-      subject: getReminderEmailSubjectTranslation(order.name)[order.language],
-      html: getReminderEmailHtmlTemplate(order.language, order.name),
-      attachments: [
-        {
-          filename: "logo.png",
-          path: __dirname + "/images/logo.png",
-          cid: "logo@nodemailer.com",
-        },
-        {
-          filename: "bubbles.png",
-          path: __dirname + "/images/bubbles.png",
-          cid: "bubbles@nodemailer.com",
-        },
-      ],
-    });
-  });
-};
 
 const OrderController = () => {
   const getClient = () => {
@@ -443,17 +389,22 @@ const OrderController = () => {
       );
 
       await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
-      await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [
-        connectedOrder.id,
-      ]);
+
+      if (connectedOrder) {
+        await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [
+          connectedOrder.id,
+        ]);
+      }
 
       if (needToCancelPaymentIntent) {
         await stripe.paymentIntents.cancel(existingOrder.payment_intent);
       }
 
-      res.status(200).json("Order deleted");
+      return res
+        .status(200)
+        .json(connectedOrder ? [id, connectedOrder.id] : [id]);
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({ error });
     } finally {
       await client.end();
     }
@@ -538,169 +489,33 @@ const OrderController = () => {
         ]
       );
 
-      const existingOrderCleaners = existingOrder.cleaner_id
-        ? existingOrder.cleaner_id.split(",").map((item) => +item)
-        : [];
-      const cleanersDifferenceLength =
-        cleanerId.length - existingOrderCleaners.length;
-
-      if (cleanersDifferenceLength) {
-        const cleanersDifference = cleanerId
-          .filter((cleaner) => !existingOrderCleaners.includes(cleaner))
-          .concat(
-            existingOrderCleaners.filter(
-              (cleaner) => !cleanerId.includes(cleaner)
-            )
-          );
-
-        if (cleanersDifferenceLength > 0) {
-          await Promise.all(
-            cleanersDifference.map(async (cleaner) => {
-              const orderDateTime = existingOrder.date.split(" ");
-              const orderDate = orderDateTime[0];
-
-              const scheduleParts = getSchedulePartsByOrder(existingOrder);
-
-              const existingScheduleQuery = await client.query(
-                "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-                [cleaner, orderDate]
-              );
-              const existingSchedule = existingScheduleQuery.rows[0];
-
-              if (existingSchedule) {
-                await client.query(
-                  `UPDATE schedule SET date = $2, first_period = $3,
-                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-                   is_fourth_period_order = $14
-                   WHERE id = $1 RETURNING *`,
-                  [
-                    existingSchedule.id,
-                    existingSchedule.date,
-                    ...getUpdatedScheduleDetailsForEdit(
-                      existingSchedule,
-                      scheduleParts
-                    ),
-                  ]
-                );
-              } else {
-                await client.query(
-                  `INSERT INTO schedule (employee_id, date, first_period, second_period,
-                third_period, fourth_period, first_period_additional,
-                second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
-                is_second_period_order, is_third_period_order, is_fourth_period_order)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-                  [
-                    cleaner,
-                    orderDate,
-                    scheduleParts.firstPeriod,
-                    scheduleParts.secondPeriod,
-                    scheduleParts.thirdPeriod,
-                    scheduleParts.fourthPeriod,
-                    scheduleParts.firstPeriodAdditional,
-                    scheduleParts.secondPeriodAdditional,
-                    scheduleParts.thirdPeriodAdditional,
-                    scheduleParts.fourthPeriodAdditional,
-                    !scheduleParts.firstPeriod,
-                    !scheduleParts.secondPeriod,
-                    !scheduleParts.thirdPeriod,
-                    !scheduleParts.fourthPeriod,
-                  ]
-                );
-              }
-            })
-          );
-        } else {
-          await Promise.all(
-            cleanersDifference.map(async (cleaner) => {
-              const orderDateTime = existingOrder.date.split(" ");
-              const orderDate = orderDateTime[0];
-
-              const scheduleParts = getSchedulePartsByOrder(existingOrder);
-
-              const existingScheduleQuery = await client.query(
-                "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-                [cleaner, orderDate]
-              );
-              const existingSchedule = existingScheduleQuery.rows[0];
-
-              if (existingSchedule) {
-                await client.query(
-                  `UPDATE schedule SET date = $2, first_period = $3,
-                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-                   is_fourth_period_order = $14
-                   WHERE id = $1 RETURNING *`,
-                  [
-                    existingSchedule.id,
-                    existingSchedule.date,
-                    ...getUpdatedScheduleDetailsForDelete(
-                      existingSchedule,
-                      scheduleParts
-                    ),
-                  ]
-                );
-              }
-            })
-          );
-        }
-      }
+      await updateScheduleForMultipleCleaners(existingOrder, cleanerId, client);
 
       const updatedOrder = { ...result.rows[0] };
 
-      if (isApprovedStatus && !existingOrder.is_confirmed) {
-        const localesQuery = await client.query("SELECT * FROM locales");
-        const locales = localesQuery.rows;
-        const currentLanguageLocales = locales
-          .filter(({ locale }) => locale === updatedOrder.language)
-          .reduce(
-            (result, { key, value }) => ({
-              ...result,
-              [key]: value,
-            }),
-            {}
-          );
+      if (isApprovedStatus) {
+        const { rows: locales } = await client.query("SELECT * FROM locales");
 
-        await transporter.sendMail({
-          from: "tytfeedback@gmail.com",
-          to: updatedOrder.email,
-          subject: confirmationEmailSubjectTranslation[updatedOrder.language],
-          html: getConfirmationEmailHtmlTemplate(
-            updatedOrder,
-            currentLanguageLocales,
-            updatedCheckList
-          ),
-          attachments: [
-            {
-              filename: "logo.png",
-              path: __dirname + "/images/logo.png",
-              cid: "logo@nodemailer.com",
-            },
-            {
-              filename: "bubbles.png",
-              path: __dirname + "/images/bubbles.png",
-              cid: "bubbles@nodemailer.com",
-            },
-          ],
-        });
+        await sendConfirmationEmailAndTelegramMessage(
+          existingOrder,
+          updatedCheckList,
+          locales,
+          transporter
+        );
       }
 
       const updatedOrders = connectedOrder
         ? [updatedOrder, connectedOrder]
         : [updatedOrder];
 
-      return res
-        .status(200)
-        .json(
-          updatedOrders.map((item) => ({
-            ...item,
-            cleaner_id: item.cleaner_id
-              ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
-              : [],
-          }))
-        );
+      return res.status(200).json(
+        updatedOrders.map((item) => ({
+          ...item,
+          cleaner_id: item.cleaner_id
+            ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
+            : [],
+        }))
+      );
     } catch (error) {
       return res.status(500).json({ error });
     } finally {
@@ -781,59 +596,7 @@ const OrderController = () => {
         ? updatedOrder.cleaner_id.split(",")
         : [];
 
-      const orderDateTime = existingOrder.date.split(" ");
-      const orderDate = orderDateTime[0];
-
-      const scheduleParts = getSchedulePartsByOrder(existingOrder);
-
-      const existingScheduleQuery = await client.query(
-        "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-        [cleanerId, orderDate]
-      );
-      const existingSchedule = existingScheduleQuery.rows[0];
-
-      if (existingSchedule) {
-        await client.query(
-          `UPDATE schedule SET date = $2, first_period = $3,
-           second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-           second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-           is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-           is_fourth_period_order = $14
-           WHERE id = $1 RETURNING *`,
-          [
-            existingSchedule.id,
-            existingSchedule.date,
-            ...getUpdatedScheduleDetailsForEdit(
-              existingSchedule,
-              scheduleParts
-            ),
-          ]
-        );
-      } else {
-        await client.query(
-          `INSERT INTO schedule (employee_id, date, first_period, second_period,
-           third_period, fourth_period, first_period_additional,
-           second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
-           is_second_period_order, is_third_period_order, is_fourth_period_order)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-          [
-            +cleanerId,
-            orderDate,
-            scheduleParts.firstPeriod,
-            scheduleParts.secondPeriod,
-            scheduleParts.thirdPeriod,
-            scheduleParts.fourthPeriod,
-            scheduleParts.firstPeriodAdditional,
-            scheduleParts.secondPeriodAdditional,
-            scheduleParts.thirdPeriodAdditional,
-            scheduleParts.fourthPeriodAdditional,
-            !scheduleParts.firstPeriod,
-            !scheduleParts.secondPeriod,
-            !scheduleParts.thirdPeriod,
-            !scheduleParts.fourthPeriod,
-          ]
-        );
-      }
+      await addOrderToSchedule(existingOrder, cleanerId, client);
 
       res.status(200).json({
         ...updatedOrder,
@@ -876,14 +639,11 @@ const OrderController = () => {
       }
 
       const {
-        rows: [connectedOrderInit],
+        rows: [connectedOrder],
       } = await client.query(
         'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
         [id, existingOrder.date, existingOrder.number, existingOrder.address]
       );
-      let connectedOrder = connectedOrderInit
-        ? { ...connectedOrderInit }
-        : null;
 
       const feedBackLinkId = connectedOrder
         ? [
@@ -924,32 +684,10 @@ const OrderController = () => {
 
       if (needToApprovePayment) {
         await stripe.paymentIntents.capture(existingOrder.payment_intent);
-
-        if (connectedOrder) {
-          const {
-            rows: [approvedConnectedOrder],
-          } = await client.query(
-            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
-          );
-
-          connectedOrder = { ...approvedConnectedOrder };
-        }
       }
 
       if (needToCancelPayment) {
         await stripe.paymentIntents.cancel(existingOrder.payment_intent);
-
-        if (connectedOrder) {
-          const {
-            rows: [canceledConnectedOrder],
-          } = await client.query(
-            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [connectedOrder.id, PAYMENT_STATUS.CANCELED]
-          );
-
-          connectedOrder = { ...canceledConnectedOrder };
-        }
       }
 
       const result = await client.query(
@@ -971,131 +709,65 @@ const OrderController = () => {
         ]
       );
 
-      if (connectedOrder && status === ORDER_STATUS.IN_PROGRESS) {
+      const getUpdatedConnectedOrder = async () => {
+        const updatedConnectedOrderFeedbackLink =
+          status === ORDER_STATUS.IN_PROGRESS
+            ? base64Orders
+            : connectedOrder.feedback_link_id;
+        const updatedConnectedOrderStatus =
+          status === ORDER_STATUS.CLOSED
+            ? ORDER_STATUS.CLOSED
+            : connectedOrder.status;
+        const updatedConnectedOrderPaymentStatus = needToApprovePayment
+          ? PAYMENT_STATUS.CONFIRMED
+          : needToCancelPayment
+          ? PAYMENT_STATUS.CANCELED
+          : connectedOrder.payment_status;
+
         const {
-          rows: [connectedOrderWithFeedback],
+          rows: [updatedConnectedOrder],
         } = await client.query(
-          'UPDATE "order" SET feedback_link_id = $2 WHERE id = $1 RETURNING *',
-          [connectedOrder.id, base64Orders]
+          'UPDATE "order" SET status = $3, payment_status = $4 feedback_link_id = $2 WHERE id = $1 RETURNING *',
+          [
+            connectedOrder.id,
+            updatedConnectedOrderFeedbackLink,
+            updatedConnectedOrderStatus,
+            updatedConnectedOrderPaymentStatus,
+          ]
         );
 
-        connectedOrder = { ...connectedOrderWithFeedback };
-      }
+        return updatedConnectedOrder;
+      };
 
       const updatedOrder = { ...result.rows[0] };
 
       if (status === ORDER_STATUS.APPROVED) {
-        const isDryOrOzonation = [
-          ORDER_TITLES.DRY_CLEANING,
-          ORDER_TITLES.OZONATION,
-        ].includes(updatedOrder.title);
+        const { rows: locales } = await client.query("SELECT * FROM locales");
 
-        if (!existingOrder.is_confirmed) {
-          const localesQuery = await client.query("SELECT * FROM locales");
-          const locales = localesQuery.rows;
-          const currentLanguageLocales = locales
-            .filter(({ locale }) => locale === updatedOrder.language)
-            .reduce(
-              (result, { key, value }) => ({
-                ...result,
-                [key]: value,
-              }),
-              {}
-            );
-
-          await transporter.sendMail({
-            from: "tytfeedback@gmail.com",
-            to: updatedOrder.email,
-            subject: confirmationEmailSubjectTranslation[updatedOrder.language],
-            html: getConfirmationEmailHtmlTemplate(
-              updatedOrder,
-              currentLanguageLocales,
-              updatedCheckList
-            ),
-            attachments: [
-              {
-                filename: "logo.png",
-                path: __dirname + "/images/logo.png",
-                cid: "logo@nodemailer.com",
-              },
-              {
-                filename: "bubbles.png",
-                path: __dirname + "/images/bubbles.png",
-                cid: "bubbles@nodemailer.com",
-              },
-            ],
-          });
-        }
-
-        if (env.getEnvironment("MODE") === "prod") {
-          await sendTelegramMessage(
-            updatedOrder.date,
-            isDryOrOzonation
-              ? APPROVED_DRY_OZONATION_CHANNEL_ID
-              : APPROVED_REGULAR_CHANNEL_ID,
-            updatedOrder.title
-          );
-        }
+        await sendConfirmationEmailAndTelegramMessage(
+          existingOrder,
+          updatedCheckList,
+          locales,
+          transporter,
+          true
+        );
       }
 
       if (status === ORDER_STATUS.DONE) {
-        const sendFeedbackLink =
-          updatedOrder.feedback_link_id &&
-          (!connectedOrder || connectedOrder.status === ORDER_STATUS.DONE);
-
-        if (sendFeedbackLink) {
-          await transporter.sendMail({
-            from: "tytfeedback@gmail.com",
-            to: updatedOrder.email,
-            subject: emailSubjectTranslation[updatedOrder.language],
-            html: getEmailHtmlTemplate(updatedOrder),
-            attachments: [
-              {
-                filename: "logo.png",
-                path: __dirname + "/images/logo.png",
-                cid: "logo@nodemailer.com",
-              },
-              {
-                filename: "bubbles.png",
-                path: __dirname + "/images/bubbles.png",
-                cid: "bubbles@nodemailer.com",
-              },
-            ],
-          });
-        }
-
-        const existingReminderQuery = await client.query(
-          "SELECT * FROM reminders WHERE email = $1",
-          [updatedOrder.email]
+        await sendFeedbackEmailAndSetReminder(
+          updatedOrder,
+          connectedOrder,
+          transporter,
+          client
         );
-        const existingReminder = existingReminderQuery.rows[0];
-        const nextReminderDate = new Date(
-          new Date().setMinutes(new Date().getMinutes() - 1)
-        );
-        const dateInMonth = getDateTimeString(nextReminderDate);
-
-        if (existingReminder) {
-          await client.query("UPDATE reminders SET date = $2 WHERE id = $1", [
-            existingReminder.id,
-            dateInMonth,
-          ]);
-        } else {
-          await client.query(
-            "INSERT INTO reminders(email, date, language, name) VALUES($1, $2, $3, $4)",
-            [
-              updatedOrder.email,
-              dateInMonth,
-              updatedOrder.language,
-              updatedOrder.name,
-            ]
-          );
-        }
-
-        scheduleReminder(nextReminderDate, updatedOrder);
       }
 
-      const updatedOrders = connectedOrder
-        ? [updatedOrder, connectedOrder]
+      const updatedConnectedOrder = connectedOrder
+        ? await getUpdatedConnectedOrder()
+        : null;
+
+      const updatedOrders = updatedConnectedOrder
+        ? [updatedOrder, updatedConnectedOrder]
         : [updatedOrder];
 
       res.status(200).json(
@@ -1358,35 +1030,7 @@ const OrderController = () => {
         ? updatedOrder.cleaner_id.split(",")
         : [];
 
-      const orderDateTime = existingOrder.date.split(" ");
-      const orderDate = orderDateTime[0];
-
-      const scheduleParts = getSchedulePartsByOrder(existingOrder);
-
-      const existingScheduleQuery = await client.query(
-        "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-        [+userId, orderDate]
-      );
-      const existingSchedule = existingScheduleQuery.rows[0];
-
-      if (existingSchedule) {
-        await client.query(
-          `UPDATE schedule SET date = $2, first_period = $3,
-                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-                   is_fourth_period_order = $14
-                   WHERE id = $1 RETURNING *`,
-          [
-            existingSchedule.id,
-            existingSchedule.date,
-            ...getUpdatedScheduleDetailsForDelete(
-              existingSchedule,
-              scheduleParts
-            ),
-          ]
-        );
-      }
+      await removeOrderFromSchedule(existingOrder, userId, client);
 
       res.status(200).json({
         ...updatedOrder,
