@@ -25,6 +25,11 @@ orderRouter
     "/order/:id/update-status/:status",
     verifyToken,
     orderController.updateOrderStatus
+  )
+  .put(
+    "/order/:id/payment-intent",
+    verifyToken,
+    orderController.connectPaymentIntent
   );
 
 module.exports = orderRouter;

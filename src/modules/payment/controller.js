@@ -1,109 +1,98 @@
-const crypto = require("crypto");
-
-const nodemailer = require("nodemailer");
 const env = require("../../helpers/environments");
+const constants = require("../../constants");
 
-const transporter = nodemailer.createTransport({
-  service: "Gmail",
-  secure: true,
-  auth: {
-    user: "tytfeedback@gmail.com",
-    pass: env.getEnvironment("EMAIL_APP_PASSWORD"),
-  },
-});
+const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
 
 const PaymentController = () => {
-  const createTransaction = async (req, res) => {
-    const {
-      sessionId,
-      amount,
-      currency,
-      description,
-      email,
-      country,
-      language,
-      urlReturn,
-      urlStatus,
-    } = req.body;
+  const createPaymentIntent = async (req, res) => {
+    const { price, email, metadata } = req.body;
 
     try {
-      const headers = new Headers();
-      headers.set("Content-Type", "application/json");
-      headers.set(
-        "Authorization",
-        "Basic " +
-          btoa(
-            env.getEnvironment("PAYMENT_MERCHANT_ID") +
-              ":" +
-              env.getEnvironment("PAYMENT_API_KEY")
-          )
-      );
+      const intent = await stripe.paymentIntents.create({
+        amount: price * 100,
+        currency: "pln",
+        capture_method: "manual",
+        receipt_email: email,
+        ...(metadata && { metadata }),
+      });
 
-      const hash = crypto.createHash("sha384");
-      const data = hash.update(
-        JSON.stringify({
-          sessionId,
-          merchantId: env.getEnvironment("PAYMENT_MERCHANT_ID"),
-          amount,
-          currency,
-          crc: env.getEnvironment("PAYMENT_CRC"),
-        }),
-        "utf-8"
-      );
-      const sign = data.digest("hex");
-
-      const createTransactionResponse = await fetch(
-        "https://sandbox.przelewy24.pl/api/v1/transaction/register",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            merchantId: env.getEnvironment("PAYMENT_MERCHANT_ID"),
-            posId: env.getEnvironment("PAYMENT_MERCHANT_ID"),
-            sessionId,
-            amount,
-            currency,
-            description,
-            email,
-            country,
-            language,
-            urlReturn,
-            urlStatus,
-            sign,
-          }),
-          headers,
-        }
-      );
-
-      const createTransactionParsedResponse =
-        await createTransactionResponse.json();
-
-      if (createTransactionParsedResponse.error) {
-        return res.status(400).json({ error });
-      }
-
-      return res.status(200).json(createTransactionParsedResponse.data.token);
+      return res
+        .status(200)
+        .json({ id: intent.id, clientSecret: intent.client_secret });
     } catch (error) {
-      return res.status(500).json({ error });
-    } finally {
+      return res.status(400).json({ message: error.raw.message });
     }
   };
 
-  const receiveNotification = async (req, res) => {
-    console.log(req.body, req.query, req.params);
+  const updatePaymentIntent = async (req, res) => {
+    const { id } = req.params;
+    const { metadata, description = "" } = req.body;
 
-    transporter.sendMail({
-      from: "tytfeedback@gmail.com",
-      to: "romkaboikov@gmail.com",
-      subject: "test",
-      text: "Test!",
-    });
+    try {
+      await stripe.paymentIntents.update(id, {
+        metadata,
+        description,
+      });
 
-    return res.status(200).json({});
+      return res.status(200).json({
+        message: `Updated payment intent ${id} metadata`,
+      });
+    } catch (error) {
+      return res.status(400).json({ message: error.raw.message });
+    }
+  };
+
+  const cancelPaymentIntent = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      await stripe.paymentIntents.cancel(id);
+
+      return res.status(200).json({
+        message: `Payment intent ${id} is canceled`,
+      });
+    } catch (error) {
+      return res.status(400).json({ message: error.raw.message });
+    }
+  };
+
+  const capturePayment = async (req, res) => {
+    const isAdmin = req.role === constants.ROLES.ADMIN;
+    const { id } = req.params;
+
+    if (!isAdmin) {
+      return res
+        .status(403)
+        .json({ message: "You don't have access to this!" });
+    }
+
+    try {
+      const intent = await stripe.paymentIntents.capture(id);
+
+      return res.status(200).json(intent);
+    } catch (error) {
+      return res.status(400).json({ message: error.raw.message });
+    }
+  };
+
+  const getPaymentIntent = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(id);
+
+      return res.status(200).json(paymentIntent);
+    } catch (error) {
+      return res.status(404).json({ message: error.raw.message });
+    }
   };
 
   return {
-    createTransaction,
-    receiveNotification,
+    createPaymentIntent,
+    updatePaymentIntent,
+    cancelPaymentIntent,
+    capturePayment,
+    getPaymentIntent,
   };
 };
 
