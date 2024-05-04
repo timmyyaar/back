@@ -3,6 +3,9 @@
   "functions": {
     "api/*": {
       "maxDuration": 180
+    },
+    "api/**/*": {
+      "maxDuration": 180
     }
   }
 }
