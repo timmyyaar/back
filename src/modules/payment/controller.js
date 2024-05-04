@@ -9,7 +9,7 @@ const PaymentController = () => {
 
     try {
       const intent = await stripe.paymentIntents.create({
-        amount: price * 100,
+        amount: Math.round(price * 100),
         currency: "pln",
         capture_method: "manual",
         receipt_email: email,
