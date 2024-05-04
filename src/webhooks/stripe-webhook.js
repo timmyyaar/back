@@ -19,7 +19,7 @@ const stripeWebhook = async (req, res) => {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    res.json({ received: true });
+    res.status(200).json({ received: true });
 
     const isPaymentCaptured =
       event.type === "payment_intent.amount_capturable_updated";
