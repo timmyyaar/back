@@ -535,12 +535,9 @@ const OrderController = () => {
 
       await client.connect();
 
-      const orderQuery = await client.query(
-        'SELECT * FROM "order" WHERE id = $1',
-        [id]
-      );
-
-      const existingOrder = orderQuery.rows[0];
+      const {
+        rows: [existingOrder],
+      } = await client.query('SELECT * FROM "order" WHERE id = $1', [id]);
 
       if (!existingOrder) {
         return res.status(404).json({ message: "Order not found" });
