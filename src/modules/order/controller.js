@@ -36,12 +36,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const {
-  CREATED_ORDERS_CHANNEL_ID,
-  ORDER_STATUS,
-  emailSubjectTranslation,
-  getReminderEmailSubjectTranslation,
-} = require("./constants");
+const { CREATED_ORDERS_CHANNEL_ID, ORDER_STATUS } = require("./constants");
 
 const OrderController = () => {
   const getClient = () => {
@@ -159,6 +154,8 @@ const OrderController = () => {
         creationDate,
         ownCheckList = false,
         paymentIntentId = null,
+        mainServiceManualCleanersCount,
+        secondServiceManualCleanersCount,
       } = req.body;
 
       if (name && number && email && address && date && city) {
@@ -215,10 +212,10 @@ const OrderController = () => {
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
               is_new_client, city, transportation_price, cleaners_count, language, 
-              creation_date, own_check_list, reward_original, payment_status, payment_intent) 
+              creation_date, own_check_list, reward_original, payment_status, payment_intent, manual_cleaners_count) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36, $37), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36, $38) RETURNING *`,
             [
               name,
               number,
@@ -268,6 +265,8 @@ const OrderController = () => {
               }),
               onlinePayment ? PAYMENT_STATUS.PENDING : null,
               paymentIntentId,
+              mainServiceManualCleanersCount,
+              secondServiceManualCleanersCount,
             ]
           );
 
@@ -286,9 +285,9 @@ const OrderController = () => {
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
              is_new_client, city, transportation_price, cleaners_count, language, 
-             creation_date, own_check_list, reward_original, payment_status, payment_intent) 
+             creation_date, own_check_list, reward_original, payment_status, payment_intent, manual_cleaners_count) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29) RETURNING *`,
             [
               name,
               number,
@@ -324,6 +323,7 @@ const OrderController = () => {
               }),
               onlinePayment ? PAYMENT_STATUS.PENDING : null,
               paymentIntentId,
+              mainServiceManualCleanersCount,
             ]
           );
 
@@ -802,10 +802,10 @@ const OrderController = () => {
         total_service_price,
         total_service_price_original,
         price_original,
-        dateCreated,
         note = null,
         reward = null,
         ownCheckList = false,
+        cleanersCount,
       } = req.body;
 
       await client.connect();
@@ -857,8 +857,9 @@ const OrderController = () => {
         `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
                date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
                counter = $11, subService = $12, total_service_price = $13,
-               total_service_price_original = $14, price_original = $15, creation_date = $16,
-               note = $17, reward = $18, own_check_list = $19, payment_intent = $20, payment_status = $21
+               total_service_price_original = $14, price_original = $15,
+               note = $16, reward = $17, own_check_list = $18, payment_intent = $19, payment_status = $20,
+               cleaners_count = $21
                WHERE id = $1 RETURNING *`,
         [
           id,
@@ -876,12 +877,12 @@ const OrderController = () => {
           total_service_price,
           total_service_price_original,
           price_original,
-          dateCreated,
           note,
           reward,
           ownCheckList || false,
           wasOnlinePaymentChanged ? null : existingOrder.payment_intent,
           wasOnlinePaymentChanged ? null : existingOrder.payment_status,
+          cleanersCount,
         ]
       );
 
