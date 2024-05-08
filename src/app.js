@@ -15,12 +15,21 @@ const getOrigin = () => {
 
   switch (appMode) {
     case "prod":
-      return "https://www.takeutime.pl/";
+      return ["https://www.takeutime.pl", "https://www.admin.takeutime.pl"];
     case "staging":
-      return "https://www.staging.takeutime.pl/";
+      return [
+        "https://www.staging.takeutime.pl",
+        "https://www.admin-staging.takeutime.pl",
+      ];
     default:
-      return true;
+      return ["http://localhost:3001"];
   }
+};
+
+const corsOptions = {
+  origin: getOrigin(),
+  credentials: true,
+  optionsSuccessStatus: 200,
 };
 
 const router = require("./router");
@@ -37,12 +46,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(cookieParser());
-app.use(
-  cors({
-    credentials: true,
-    origin: getOrigin(),
-  })
-);
+app.use(cors(corsOptions));
 
 app.get("/", (req, res) => {
   res.json({ message: "🦄🌈✨👋🌎🌍🌏✨🌈🦄" });
