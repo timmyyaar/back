@@ -1,5 +1,7 @@
 const schedule = require("node-schedule");
 
+const pool = require("../../db/pool");
+
 const env = require("../../helpers/environments");
 const { getDateTimeString } = require("../../utils");
 const {
@@ -117,8 +119,7 @@ const scheduleReminder = (date, order, transporter) => {
 const sendFeedbackEmailAndSetReminder = async (
   updatedOrder,
   connectedOrder,
-  transporter,
-  client
+  transporter
 ) => {
   const sendFeedbackLink =
     updatedOrder.feedback_link_id &&
@@ -145,7 +146,7 @@ const sendFeedbackEmailAndSetReminder = async (
     });
   }
 
-  const existingReminderQuery = await client.query(
+  const existingReminderQuery = await pool.query(
     "SELECT * FROM reminders WHERE email = $1",
     [updatedOrder.email]
   );
@@ -156,12 +157,12 @@ const sendFeedbackEmailAndSetReminder = async (
   const dateInMonth = getDateTimeString(nextReminderDate);
 
   if (existingReminder) {
-    await client.query("UPDATE reminders SET date = $2 WHERE id = $1", [
+    await pool.query("UPDATE reminders SET date = $2 WHERE id = $1", [
       existingReminder.id,
       dateInMonth,
     ]);
   } else {
-    await client.query(
+    await pool.query(
       "INSERT INTO reminders(email, date, language, name) VALUES($1, $2, $3, $4)",
       [
         updatedOrder.email,
@@ -175,20 +176,20 @@ const sendFeedbackEmailAndSetReminder = async (
   scheduleReminder(nextReminderDate, updatedOrder);
 };
 
-const addOrderToSchedule = async (existingOrder, cleanerId, client) => {
+const addOrderToSchedule = async (existingOrder, cleanerId) => {
   const orderDateTime = existingOrder.date.split(" ");
   const orderDate = orderDateTime[0];
 
   const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-  const existingScheduleQuery = await client.query(
+  const existingScheduleQuery = await pool.query(
     "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
     [cleanerId, orderDate]
   );
   const existingSchedule = existingScheduleQuery.rows[0];
 
   if (existingSchedule) {
-    await client.query(
+    await pool.query(
       `UPDATE schedule SET date = $2, first_period = $3,
            second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
            second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
@@ -202,7 +203,7 @@ const addOrderToSchedule = async (existingOrder, cleanerId, client) => {
       ]
     );
   } else {
-    await client.query(
+    await pool.query(
       `INSERT INTO schedule (employee_id, date, first_period, second_period,
            third_period, fourth_period, first_period_additional,
            second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
@@ -228,20 +229,20 @@ const addOrderToSchedule = async (existingOrder, cleanerId, client) => {
   }
 };
 
-const removeOrderFromSchedule = async (existingOrder, userId, client) => {
+const removeOrderFromSchedule = async (existingOrder, userId) => {
   const orderDateTime = existingOrder.date.split(" ");
   const orderDate = orderDateTime[0];
 
   const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-  const existingScheduleQuery = await client.query(
+  const existingScheduleQuery = await pool.query(
     "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
     [+userId, orderDate]
   );
   const existingSchedule = existingScheduleQuery.rows[0];
 
   if (existingSchedule) {
-    await client.query(
+    await pool.query(
       `UPDATE schedule SET date = $2, first_period = $3,
                    second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
                    second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
@@ -257,11 +258,7 @@ const removeOrderFromSchedule = async (existingOrder, userId, client) => {
   }
 };
 
-const updateScheduleForMultipleCleaners = async (
-  existingOrder,
-  cleanerId,
-  client
-) => {
+const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
   const existingOrderCleaners = existingOrder.cleaner_id
     ? existingOrder.cleaner_id.split(",").map((item) => +item)
     : [];
@@ -283,14 +280,14 @@ const updateScheduleForMultipleCleaners = async (
 
           const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-          const existingScheduleQuery = await client.query(
+          const existingScheduleQuery = await pool.query(
             "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
             [cleaner, orderDate]
           );
           const existingSchedule = existingScheduleQuery.rows[0];
 
           if (existingSchedule) {
-            await client.query(
+            await pool.query(
               `UPDATE schedule SET date = $2, first_period = $3,
                    second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
                    second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
@@ -307,7 +304,7 @@ const updateScheduleForMultipleCleaners = async (
               ]
             );
           } else {
-            await client.query(
+            await pool.query(
               `INSERT INTO schedule (employee_id, date, first_period, second_period,
                 third_period, fourth_period, first_period_additional,
                 second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
@@ -341,14 +338,14 @@ const updateScheduleForMultipleCleaners = async (
 
           const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-          const existingScheduleQuery = await client.query(
+          const existingScheduleQuery = await pool.query(
             "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
             [cleaner, orderDate]
           );
           const existingSchedule = existingScheduleQuery.rows[0];
 
           if (existingSchedule) {
-            await client.query(
+            await pool.query(
               `UPDATE schedule SET date = $2, first_period = $3,
                    second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
                    second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,

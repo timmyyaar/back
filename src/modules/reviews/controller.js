@@ -1,38 +1,19 @@
+const pool = require("../../db/pool");
+
 const constants = require("../../constants");
 
-const { Client } = require("pg");
-
-const env = require("../../helpers/environments");
-
 const ReviewsController = () => {
-  const getClient = () => {
-    const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
-
-    return new Client({
-      connectionString: `${POSTGRES_URL}?sslmode=require`,
-    });
-  };
-
   const getReviews = async (req, res) => {
-    const client = getClient();
-
     try {
-      await client.connect();
-      const result = await client.query(
-        "SELECT * FROM reviews ORDER BY id ASC"
-      );
+      const result = await pool.query("SELECT * FROM reviews ORDER BY id ASC");
 
       return res.json(result.rows);
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const createReview = async (req, res) => {
-    const client = getClient();
-
     try {
       const { rating, name, email, text, visible } = req.body;
 
@@ -41,9 +22,7 @@ const ReviewsController = () => {
           res.status(422).json({ message: "Invalid email" });
         }
 
-        await client.connect();
-
-        const result = await client.query(
+        const result = await pool.query(
           "INSERT INTO reviews(rating, name, email, text, visible) VALUES($1, $2, $3, $4, $5) RETURNING *",
           [rating, name, email, text, visible ? "1" : "0"]
         );
@@ -56,14 +35,10 @@ const ReviewsController = () => {
       }
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const editReview = async (req, res) => {
-    const client = getClient();
-
     try {
       const { rating, name, email, text, visible } = req.body;
       const id = req.params.id;
@@ -73,9 +48,7 @@ const ReviewsController = () => {
           res.status(422).json({ message: "Invalid email" });
         }
 
-        await client.connect();
-
-        const reviewExists = await client.query(
+        const reviewExists = await pool.query(
           "SELECT * FROM reviews WHERE id = $1",
           [id]
         );
@@ -83,7 +56,7 @@ const ReviewsController = () => {
         if (reviewExists.rowCount === 0) {
           res.status(404).json({ message: "Review not found" });
         } else {
-          const result = await client.query(
+          const result = await pool.query(
             "UPDATE reviews SET rating = $2, name = $3, email = $4, text = $5, visible = $6 WHERE id = $1 RETURNING *",
             [id, rating, name, email, text, visible ? "1" : "0"]
           );
@@ -97,20 +70,14 @@ const ReviewsController = () => {
       }
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const deleteReview = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
 
-      await client.connect();
-
-      const result = await client.query(
+      const result = await pool.query(
         "DELETE FROM reviews WHERE id = $1 RETURNING *",
         [id]
       );
@@ -120,8 +87,6 @@ const ReviewsController = () => {
         .json({ message: "Review deleted", review: result.rows[0] });
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 

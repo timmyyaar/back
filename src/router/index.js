@@ -15,8 +15,6 @@ const blogsRouter = require("../modules/blogs");
 const pricesRouter = require("../modules/prices");
 const paymentRouter = require("../modules/payment");
 
-const tasksRouter = require("../modules/tasks");
-
 const router = express.Router();
 
 router
@@ -25,7 +23,6 @@ router
   .use(promoRouter)
   .use(giftRouter)
   .use(orderRouter)
-  .use(tasksRouter)
   .use(reviewsRouter)
   .use(usersRouter)
   .use(discountsRouter)

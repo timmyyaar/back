@@ -1,4 +1,4 @@
-const { Client } = require("pg");
+const pool = require("../db/pool");
 
 const env = require("../helpers/environments");
 const { PAYMENT_STATUS } = require("../constants");
@@ -26,12 +26,6 @@ const stripeWebhook = async (req, res) => {
     const isPaymentFailed = event.type === "payment_intent.payment_failed";
 
     if (isPaymentCaptured || isPaymentFailed) {
-      const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
-
-      const client = new Client({
-        connectionString: `${POSTGRES_URL}?sslmode=require`,
-      });
-
       const paymentIntent = event.data.object;
       const orderIds =
         paymentIntent.metadata.orderIds
@@ -39,11 +33,9 @@ const stripeWebhook = async (req, res) => {
           ?.map((orderId) => +orderId) || [];
 
       try {
-        await client.connect();
-
         await Promise.all(
           orderIds.map(async (id) => {
-            const orderQuery = await client.query(
+            const orderQuery = await pool.query(
               'SELECT * FROM "order" WHERE id = $1',
               [id]
             );
@@ -55,7 +47,7 @@ const stripeWebhook = async (req, res) => {
               return Promise.resolve();
             }
 
-            await client.query(
+            await pool.query(
               'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
               [
                 id,
@@ -66,8 +58,13 @@ const stripeWebhook = async (req, res) => {
             );
           })
         );
-      } finally {
-        await client.end();
+      } catch (error) {
+        return res
+          .status(500)
+          .json({
+            message:
+              "Event was catched successfully, but some DB error occurred",
+          });
       }
     }
   } catch (error) {
