@@ -1073,6 +1073,50 @@ const OrderController = () => {
     }
   };
 
+  const updateOrderInvoiceStatus = async (req, res) => {
+    const client = getClient();
+
+    try {
+      const id = req.params.id;
+      const { isPaid } = req.body;
+
+      await client.connect();
+
+      const {
+        rows: [{ exists }],
+      } = await client.query(
+        'SELECT EXISTS(SELECT 1 FROM "order" WHERE id = $1)',
+        [id]
+      );
+
+      if (!exists) {
+        return res
+          .status(404)
+          .json({ message: `Order with ${id} id doesn't exist` });
+      }
+
+      const {
+        rows: [updatedOrder],
+      } = await client.query(
+        `UPDATE "order" SET is_invoice_paid = $2 WHERE id = $1 RETURNING *`,
+        [id, isPaid]
+      );
+
+      const updatedOrderCleanerId = updatedOrder.cleaner_id
+        ? updatedOrder.cleaner_id.split(",")
+        : [];
+
+      return res.status(200).json({
+        ...updatedOrder,
+        cleaner_id: updatedOrderCleanerId.map((item) => +item),
+      });
+    } catch (error) {
+      return res.status(500).json({ error });
+    } finally {
+      await client.end();
+    }
+  };
+
   const connectPaymentIntent = async (req, res) => {
     const client = getClient();
 
@@ -1182,6 +1226,7 @@ const OrderController = () => {
     sendFeedback,
     refuseOrder,
     updateOrderExtraExpenses,
+    updateOrderInvoiceStatus,
     connectPaymentIntent,
   };
 };
