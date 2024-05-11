@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const constants = require("../../constants");
 const { getUpdatedUserRating } = require("../../utils");
 
-const { Client } = require("pg");
+const pool = require("../../db/pool");
 
 const env = require("../../helpers/environments");
 
@@ -26,17 +26,7 @@ const getUserWithRating = (user) => {
 };
 
 const UsersController = () => {
-  const getClient = () => {
-    const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
-
-    return new Client({
-      connectionString: `${POSTGRES_URL}?sslmode=require`,
-    });
-  };
-
   const signUp = async (req, res) => {
-    const client = getClient();
-
     try {
       const { email, password } = req.body;
 
@@ -45,9 +35,7 @@ const UsersController = () => {
         password: await bcrypt.hash(password, 10),
       };
 
-      await client.connect();
-
-      const userQuery = await client.query(
+      const userQuery = await pool.query(
         "SELECT * FROM users WHERE email = $1",
         [email]
       );
@@ -57,7 +45,7 @@ const UsersController = () => {
         return res.status(409).send("User with such email already exists!");
       }
 
-      const result = await client.query(
+      const result = await pool.query(
         "INSERT INTO users(email, password, role) VALUES($1, $2, $3) RETURNING *",
         [data.email, data.password, "admin"]
       );
@@ -69,20 +57,14 @@ const UsersController = () => {
       }
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const login = async (req, res) => {
-    const client = getClient();
-
     try {
       const { email, password } = req.body;
 
-      await client.connect();
-
-      const userQuery = await client.query(
+      const userQuery = await pool.query(
         "SELECT * FROM users WHERE email = $1",
         [email]
       );
@@ -122,14 +104,10 @@ const UsersController = () => {
       }
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const getUsers = async (req, res) => {
-    const client = getClient();
-
     if (req.role !== constants.ROLES.ADMIN) {
       return res
         .status(403)
@@ -137,23 +115,17 @@ const UsersController = () => {
     }
 
     try {
-      await client.connect();
-      const result = await client.query("SELECT * FROM users ORDER BY id ASC");
+      const result = await pool.query("SELECT * FROM users ORDER BY id ASC");
 
       res.json(result.rows.map(getUserWithRating));
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const getMyUser = async (req, res) => {
-    const client = getClient();
-
     try {
-      await client.connect();
-      const result = await client.query("SELECT * FROM users WHERE id = $1", [
+      const result = await pool.query("SELECT * FROM users WHERE id = $1", [
         req.userId,
       ]);
       const user = getUserWithRating(result.rows[0]);
@@ -161,14 +133,10 @@ const UsersController = () => {
       res.json({ id: user.id, email: user.email, rating: user.rating });
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const createUser = async (req, res) => {
-    const client = getClient();
-
     if (req.role !== constants.ROLES.ADMIN) {
       return res
         .status(403)
@@ -188,9 +156,7 @@ const UsersController = () => {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      await client.connect();
-
-      const userQuery = await client.query(
+      const userQuery = await pool.query(
         "SELECT * FROM users WHERE email = $1",
         [email]
       );
@@ -206,7 +172,7 @@ const UsersController = () => {
         return res.status(422).json({ message: "Invalid email!" });
       }
 
-      const result = await client.query(
+      const result = await pool.query(
         `INSERT INTO users(email, password, role, have_vacuum_cleaner,
          have_car, first_name, last_name) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [
@@ -223,14 +189,10 @@ const UsersController = () => {
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const updateUser = async (req, res) => {
-    const client = getClient();
-
     if (req.role !== constants.ROLES.ADMIN) {
       return res
         .status(403)
@@ -242,9 +204,7 @@ const UsersController = () => {
         req.body;
       const id = req.params.id;
 
-      await client.connect();
-
-      const result = await client.query(
+      const result = await pool.query(
         `UPDATE users SET role = $2, have_vacuum_cleaner = $3, have_car = $4,
            first_name = $5, last_name = $6 WHERE id = $1 RETURNING *`,
         [id, role, haveVacuumCleaner, haveCar, firstName, lastName]
@@ -253,14 +213,10 @@ const UsersController = () => {
       return res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const changePassword = async (req, res) => {
-    const client = getClient();
-
     if (req.role !== constants.ROLES.ADMIN) {
       return res
         .status(403)
@@ -273,9 +229,7 @@ const UsersController = () => {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      await client.connect();
-
-      const result = await client.query(
+      const result = await pool.query(
         "UPDATE users SET password = $2 WHERE id = $1 RETURNING *",
         [id, hashedPassword]
       );
@@ -283,14 +237,10 @@ const UsersController = () => {
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const deleteUser = async (req, res) => {
-    const client = getClient();
-
     if (req.role !== constants.ROLES.ADMIN) {
       return res
         .status(403)
@@ -300,13 +250,11 @@ const UsersController = () => {
     try {
       const id = req.params.id;
 
-      await client.connect();
-
-      const result = await client.query(
+      const result = await pool.query(
         "DELETE FROM users WHERE id = $1 RETURNING *",
         [id]
       );
-      await client.query(
+      await pool.query(
         'UPDATE "order" SET cleaner_id = null WHERE id = $1 RETURNING *',
         [id]
       );
@@ -314,14 +262,10 @@ const UsersController = () => {
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const updateUserRating = async (req, res) => {
-    const client = getClient();
-
     if (req.role !== constants.ROLES.ADMIN) {
       return res
         .status(403)
@@ -332,17 +276,14 @@ const UsersController = () => {
       const { rating } = req.body;
       const id = req.params.id;
 
-      await client.connect();
-
-      const userQuery = await client.query(
-        "SELECT * FROM users WHERE id = $1",
-        [id]
-      );
+      const userQuery = await pool.query("SELECT * FROM users WHERE id = $1", [
+        id,
+      ]);
       const existingUser = userQuery.rows[0];
       const currentUserRating = existingUser.rating || "";
       const updatedRating = getUpdatedUserRating(currentUserRating, rating);
 
-      const result = await client.query(
+      const result = await pool.query(
         "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
         [id, updatedRating]
       );
@@ -350,8 +291,6 @@ const UsersController = () => {
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 

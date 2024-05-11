@@ -1,4 +1,4 @@
-const { Client } = require("pg");
+const pool = require("../../db/pool");
 const fs = require("fs");
 const { put, del } = require("@vercel/blob");
 const { formidable } = require("formidable");
@@ -6,26 +6,13 @@ const { formidable } = require("formidable");
 const env = require("../../helpers/environments");
 
 const BlogsController = () => {
-  const getClient = () => {
-    const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
-    const client = new Client({
-      connectionString: `${POSTGRES_URL}?sslmode=require`,
-    });
-
-    return client;
-  };
-
   const getBlogs = async (req, res) => {
-    const client = getClient();
-
     const { id } = req.params;
 
     try {
-      await client.connect();
-
       const result = id
-        ? await client.query("SELECT * FROM blogs WHERE id = $1", [id])
-        : await client.query("SELECT * FROM blogs");
+        ? await pool.query("SELECT * FROM blogs WHERE id = $1", [id])
+        : await pool.query("SELECT * FROM blogs");
 
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "No blogs found" });
@@ -34,17 +21,11 @@ const BlogsController = () => {
       return res.json(id ? result.rows[0] : result.rows);
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const addBlog = async (req, res) => {
-    const client = getClient();
-
     try {
-      await client.connect();
-
       const form = formidable({ multiples: true });
 
       await form.parse(req, async (err, fields, files) => {
@@ -87,7 +68,7 @@ const BlogsController = () => {
           }
         );
 
-        const newBlogQuery = await client.query(
+        const newBlogQuery = await pool.query(
           `INSERT INTO blogs (title, category, main_image, date, blog_image_one,
              blog_image_two, read_time, text) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
           [
@@ -102,25 +83,17 @@ const BlogsController = () => {
           ]
         );
 
-        client.end();
-
         return res.status(200).json(newBlogQuery.rows[0]);
       });
     } catch (error) {
-      client.end();
-
       return res.status(500).json({ error });
     }
   };
 
   const editBlog = async (req, res) => {
-    const client = getClient();
-
     const { id } = req.params;
 
     try {
-      await client.connect();
-
       const form = formidable({ multiples: true });
 
       await form.parse(req, async (err, fields, files) => {
@@ -138,7 +111,7 @@ const BlogsController = () => {
           ? fs.readFileSync(blogImageTwo.filepath)
           : null;
 
-        const existingBlogQuery = await client.query(
+        const existingBlogQuery = await pool.query(
           "SELECT * FROM blogs WHERE id = $1",
           [id]
         );
@@ -181,7 +154,7 @@ const BlogsController = () => {
             )
           : null;
 
-        const newBlogQuery = await client.query(
+        const newBlogQuery = await pool.query(
           `UPDATE blogs SET title = $2, category = $3, main_image = $4,
               date = $5, blog_image_one = $6, blog_image_two = $7, read_time = $8,
               text = $9 WHERE id = $1 RETURNING *`,
@@ -220,13 +193,9 @@ const BlogsController = () => {
           });
         }
 
-        client.end();
-
         return res.status(200).json(newBlogQuery.rows[0]);
       });
     } catch (error) {
-      client.end();
-
       return res.status(500).json({ error });
     }
   };
@@ -235,12 +204,8 @@ const BlogsController = () => {
     const { mainImageUrl, blogImageOneUrl, blogImageTwoUrl } = req.body;
     const { id } = req.params;
 
-    const client = getClient();
-
     try {
-      await client.connect();
-
-      const existingBlogQuery = await client.query(
+      const existingBlogQuery = await pool.query(
         "SELECT * FROM blogs WHERE id = $1",
         [id]
       );
@@ -256,13 +221,11 @@ const BlogsController = () => {
         token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
       });
 
-      await client.query("DELETE FROM blogs WHERE id = $1", [id]);
+      await pool.query("DELETE FROM blogs WHERE id = $1", [id]);
 
       return res.status(200).json({ message: "Blog was deleted" });
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
