@@ -19,6 +19,11 @@ orderRouter
     verifyToken,
     orderController.updateOrderExtraExpenses
   )
+  .patch(
+    "/order/:id/invoice-status",
+    verifyToken,
+    orderController.updateOrderInvoiceStatus
+  )
   .patch("/order/:id/assign", verifyToken, orderController.assignOrder)
   .patch("/order/:id/:cleanerId", verifyToken, orderController.assignOnMe)
   .patch(
