@@ -130,7 +130,12 @@ const UsersController = () => {
       ]);
       const user = getUserWithRating(result.rows[0]);
 
-      res.json({ id: user.id, email: user.email, rating: user.rating });
+      res.json({
+        id: user.id,
+        email: user.email,
+        rating: user.rating,
+        role: user.role,
+      });
     } catch (error) {
       res.status(500).json({ error });
     }
