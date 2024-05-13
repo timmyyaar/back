@@ -1,38 +1,19 @@
-const { Client } = require("pg");
+const pool = require("../../db/pool");
 
 const constants = require("../../constants");
 
-const env = require("../../helpers/environments");
-
 const PricesController = () => {
-  const getClient = () => {
-    const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
-    const client = new Client({
-      connectionString: `${POSTGRES_URL}?sslmode=require`,
-    });
-
-    return client;
-  };
-
   const getPrices = async (req, res) => {
-    const client = getClient();
-
     try {
-      await client.connect();
-
-      const result = await client.query("SELECT * FROM prices");
+      const result = await pool.query("SELECT * FROM prices");
 
       return res.json(result.rows);
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const updatePrice = async (req, res) => {
-    const client = getClient();
-
     const isAdmin = req.role === constants.ROLES.ADMIN;
 
     if (!isAdmin) {
@@ -52,12 +33,10 @@ const PricesController = () => {
     }
 
     try {
-      await client.connect();
-
       await Promise.all(
         prices.map(
           async ({ key, price }) =>
-            await client.query("UPDATE prices SET price = $2 WHERE key = $1", [
+            await pool.query("UPDATE prices SET price = $2 WHERE key = $1", [
               key,
               price,
             ])
@@ -67,8 +46,6 @@ const PricesController = () => {
       return res.json({ message: "Prices have been updated!" });
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 

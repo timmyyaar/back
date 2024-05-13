@@ -1,4 +1,5 @@
-const { Client } = require("pg");
+const pool = require("../../db/pool");
+
 const nodemailer = require("nodemailer");
 
 const env = require("../../helpers/environments");
@@ -39,21 +40,8 @@ const transporter = nodemailer.createTransport({
 const { CREATED_ORDERS_CHANNEL_ID, ORDER_STATUS } = require("./constants");
 
 const OrderController = () => {
-  const getClient = () => {
-    const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
-    const client = new Client({
-      connectionString: `${POSTGRES_URL}?sslmode=require`,
-    });
-
-    return client;
-  };
-
   const reScheduleReminders = async () => {
-    const client = getClient();
-
-    await client.connect();
-
-    const remindersQuery = await client.query("SELECT * FROM reminders");
+    const remindersQuery = await pool.query("SELECT * FROM reminders");
     const reminders = remindersQuery.rows;
 
     reminders.forEach((row) => {
@@ -61,19 +49,35 @@ const OrderController = () => {
 
       scheduleReminder(date, row);
     });
-
-    await client.end();
   };
 
   reScheduleReminders();
 
   const getOrder = async (req, res) => {
-    const client = getClient();
+    try {
+      const result = await pool.query('SELECT * FROM "order" ORDER BY id DESC');
+
+      return res.json(
+        result.rows.map((item) => {
+          const cleaner_id = item.cleaner_id ? item.cleaner_id.split(",") : [];
+
+          return { ...item, cleaner_id: cleaner_id.map((item) => +item) };
+        })
+      );
+    } catch (error) {
+      return res.status(500).json({ error });
+    }
+  };
+
+  const getClientOrder = async (req, res) => {
+    const { ids } = req.query;
+
+    const idsArray = ids.split(",").map((item) => +item);
 
     try {
-      await client.connect();
-      const result = await client.query(
-        'SELECT * FROM "order" ORDER BY id DESC'
+      const result = await pool.query(
+        'SELECT * FROM "order" WHERE id = ANY($1::int[])',
+        [idsArray]
       );
 
       return res.json(
@@ -85,41 +89,10 @@ const OrderController = () => {
       );
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
-    }
-  };
-
-  const getClientOrder = async (req, res) => {
-    const client = getClient();
-
-    const { ids } = req.query;
-
-    const idsArray = ids.split(",").map((item) => +item);
-
-    try {
-      await client.connect();
-      const result = await client.query(
-        'SELECT * FROM "order" WHERE id = ANY($1::int[])',
-        [idsArray]
-      );
-
-      res.json(
-        result.rows.map((item) => {
-          const cleaner_id = item.cleaner_id ? item.cleaner_id.split(",") : [];
-
-          return { ...item, cleaner_id: cleaner_id.map((item) => +item) };
-        })
-      );
-    } catch (error) {
-      res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const createOrder = async (req, res) => {
-    const client = getClient();
     try {
       const {
         name,
@@ -159,10 +132,8 @@ const OrderController = () => {
       } = req.body;
 
       if (name && number && email && address && date && city) {
-        await client.connect();
-
         if (promo) {
-          const isPromoUsed = await client.query(
+          const isPromoUsed = await pool.query(
             'SELECT * FROM "order" WHERE (promo = $1) AND (address = $2 OR number = $3)',
             [promo, address, number]
           );
@@ -171,7 +142,7 @@ const OrderController = () => {
             return res.status(409).send({ message: "Promo already used!" });
           }
 
-          const existingPromoQuery = await client.query(
+          const existingPromoQuery = await pool.query(
             "SELECT * FROM promo WHERE code = $1",
             [promo]
           );
@@ -183,21 +154,21 @@ const OrderController = () => {
           ) {
             return res.status(410).send("This promo is expired!");
           } else {
-            await client.query(
-              "UPDATE promo SET count_used = $1 WHERE id = $2",
-              [existingPromo.count_used + 1, existingPromo.id]
-            );
+            await pool.query("UPDATE promo SET count_used = $1 WHERE id = $2", [
+              existingPromo.count_used + 1,
+              existingPromo.id,
+            ]);
           }
         }
 
-        const isClientExists = await client.query(
+        const isClientExists = await pool.query(
           "SELECT * FROM clients WHERE (phone = $1 AND name = $2)",
           [number, name]
         );
         const isNewClient = isClientExists.rowCount === 0;
 
         if (isNewClient) {
-          await client.query(
+          await pool.query(
             `INSERT INTO clients (name, phone, email, address, first_order_creation_date, first_order_date)
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [name, number, email, address, creationDate, date]
@@ -205,7 +176,7 @@ const OrderController = () => {
         }
 
         if (secTitle) {
-          const result = await client.query(
+          const result = await pool.query(
             `INSERT INTO "order" 
               (name, number, email, address, date, onlinePayment, 
               requestPreviousCleaner, personalData, promo, 
@@ -278,7 +249,7 @@ const OrderController = () => {
             .status(200)
             .json(result.rows.map((order) => ({ ...order, cleaner_id: [] })));
         } else {
-          const result = await client.query(
+          const result = await pool.query(
             `INSERT INTO "order" 
              (name, number, email, address, date, onlinePayment, 
              requestPreviousCleaner, personalData, price, promo, 
@@ -343,20 +314,14 @@ const OrderController = () => {
       }
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const deleteOrder = async (req, res) => {
-    const client = getClient();
-
     try {
       const { id } = req.params;
 
-      await client.connect();
-
-      const existingOrderQuery = await client.query(
+      const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
         [id]
       );
@@ -375,7 +340,7 @@ const OrderController = () => {
 
       const {
         rows: [connectedOrder],
-      } = await client.query(
+      } = await pool.query(
         `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
            and address = $4 and name = $5 and creation_date = $6)`,
         [
@@ -388,10 +353,10 @@ const OrderController = () => {
         ]
       );
 
-      await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
+      await pool.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
 
       if (connectedOrder) {
-        await client.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [
+        await pool.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [
           connectedOrder.id,
         ]);
       }
@@ -405,21 +370,15 @@ const OrderController = () => {
         .json(connectedOrder ? [+id, +connectedOrder.id] : [+id]);
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const assignOrder = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
       const { cleanerId = [] } = req.body;
 
-      await client.connect();
-
-      const existingOrderQuery = await client.query(
+      const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
         [id]
       );
@@ -431,7 +390,7 @@ const OrderController = () => {
 
       const {
         rows: [connectedOrderInit],
-      } = await client.query(
+      } = await pool.query(
         'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
         [id, existingOrder.date, existingOrder.number, existingOrder.address]
       );
@@ -465,7 +424,7 @@ const OrderController = () => {
         if (connectedOrder) {
           const {
             rows: [approvedConnectedOrder],
-          } = await client.query(
+          } = await pool.query(
             'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
             [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
           );
@@ -474,7 +433,7 @@ const OrderController = () => {
         }
       }
 
-      const result = await client.query(
+      const result = await pool.query(
         `UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4,
          is_confirmed = $5, payment_status = $6 WHERE id = $1 RETURNING *`,
         [
@@ -489,12 +448,12 @@ const OrderController = () => {
         ]
       );
 
-      await updateScheduleForMultipleCleaners(existingOrder, cleanerId, client);
+      await updateScheduleForMultipleCleaners(existingOrder, cleanerId);
 
       const updatedOrder = { ...result.rows[0] };
 
       if (isApprovedStatus) {
-        const { rows: locales } = await client.query("SELECT * FROM locales");
+        const { rows: locales } = await pool.query("SELECT * FROM locales");
 
         await sendConfirmationEmailAndTelegramMessage(
           existingOrder,
@@ -518,14 +477,10 @@ const OrderController = () => {
       );
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const assignOnMe = async (req, res) => {
-    const client = getClient();
-
     try {
       const { id, cleanerId } = req.params;
 
@@ -533,11 +488,9 @@ const OrderController = () => {
         return res.status(404).json({ message: "Not found" });
       }
 
-      await client.connect();
-
       const {
         rows: [existingOrder],
-      } = await client.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
 
       if (!existingOrder) {
         return res.status(404).json({ message: "Order not found" });
@@ -547,13 +500,13 @@ const OrderController = () => {
         ? existingOrder.cleaner_id.split(",")
         : [];
 
-      const cleanersQuery = await client.query(
+      const cleanersQuery = await pool.query(
         "SELECT * FROM users WHERE id = ANY($1::int[])",
         [existingCleanerId]
       );
       const assignedCleaners = cleanersQuery.rows;
 
-      const currentCleanerQuery = await client.query(
+      const currentCleanerQuery = await pool.query(
         "SELECT * FROM users WHERE id = $1",
         [cleanerId]
       );
@@ -584,7 +537,7 @@ const OrderController = () => {
           .json({ message: "You already assigned to this order!" });
       }
 
-      const result = await client.query(
+      const result = await pool.query(
         'UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *',
         [id, [...existingCleanerId, cleanerId].join(",")]
       );
@@ -593,7 +546,7 @@ const OrderController = () => {
         ? updatedOrder.cleaner_id.split(",")
         : [];
 
-      await addOrderToSchedule(existingOrder, cleanerId, client);
+      await addOrderToSchedule(existingOrder, cleanerId);
 
       res.status(200).json({
         ...updatedOrder,
@@ -601,14 +554,10 @@ const OrderController = () => {
       });
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const updateOrderStatus = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
       const status = req.params.status;
@@ -623,9 +572,7 @@ const OrderController = () => {
 
       const { checkList } = req.body;
 
-      await client.connect();
-
-      const existingOrderQuery = await client.query(
+      const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE (id = $1)',
         [id]
       );
@@ -637,7 +584,7 @@ const OrderController = () => {
 
       const {
         rows: [connectedOrder],
-      } = await client.query(
+      } = await pool.query(
         'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
         [id, existingOrder.date, existingOrder.number, existingOrder.address]
       );
@@ -687,7 +634,7 @@ const OrderController = () => {
         await stripe.paymentIntents.cancel(existingOrder.payment_intent);
       }
 
-      const result = await client.query(
+      const result = await pool.query(
         `UPDATE "order" SET status = $2, feedback_link_id = $3,
          check_list = $4, is_confirmed = $5, payment_status = $6 WHERE id = $1 RETURNING *`,
         [
@@ -723,7 +670,7 @@ const OrderController = () => {
 
         const {
           rows: [updatedConnectedOrder],
-        } = await client.query(
+        } = await pool.query(
           'UPDATE "order" SET feedback_link_id = $2, status = $3, payment_status = $4 WHERE id = $1 RETURNING *',
           [
             connectedOrder.id,
@@ -739,7 +686,7 @@ const OrderController = () => {
       const updatedOrder = { ...result.rows[0] };
 
       if (status === ORDER_STATUS.APPROVED) {
-        const { rows: locales } = await client.query("SELECT * FROM locales");
+        const { rows: locales } = await pool.query("SELECT * FROM locales");
 
         await sendConfirmationEmailAndTelegramMessage(
           existingOrder,
@@ -755,7 +702,6 @@ const OrderController = () => {
           updatedOrder,
           connectedOrder,
           transporter,
-          client
         );
       }
 
@@ -777,14 +723,10 @@ const OrderController = () => {
       );
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const updateOrder = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
       const {
@@ -809,15 +751,13 @@ const OrderController = () => {
         aggregator,
       } = req.body;
 
-      await client.connect();
-
       const {
         rows: [existingOrder],
-      } = await client.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
 
       const {
         rows: [connectedOrder],
-      } = await client.query(
+      } = await pool.query(
         `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
            and address = $4 and name = $5 and creation_date = $6)`,
         [
@@ -854,7 +794,7 @@ const OrderController = () => {
 
       const {
         rows: [updatedOrder],
-      } = await client.query(
+      } = await pool.query(
         `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
                date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
                counter = $11, subService = $12, total_service_price = $13,
@@ -893,7 +833,7 @@ const OrderController = () => {
       if (connectedOrder) {
         const {
           rows: [updatedConnectedOrder],
-        } = await client.query(
+        } = await pool.query(
           `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
                date = $6, onlinePayment = $7, payment_intent = $8, payment_status = $9 WHERE id = $1 RETURNING *`,
           [
@@ -922,27 +862,21 @@ const OrderController = () => {
       );
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const sendFeedback = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
       const { feedback, rating } = req.body;
 
-      await client.connect();
-
-      const existingOrder = await client.query(
+      const existingOrder = await pool.query(
         `SELECT * FROM "order" WHERE id = $1`,
         [id]
       );
 
       if (!existingOrder.rows[0].feedback) {
-        const orderQuery = await client.query(
+        const orderQuery = await pool.query(
           `UPDATE "order" SET feedback = $2, rating = $3 WHERE id = $1 RETURNING *`,
           [id, feedback, rating]
         );
@@ -955,7 +889,7 @@ const OrderController = () => {
 
         await Promise.all(
           cleanerIds.map(async (id) => {
-            const userQuery = await client.query(
+            const userQuery = await pool.query(
               "SELECT * FROM users WHERE id = $1",
               [id]
             );
@@ -968,7 +902,7 @@ const OrderController = () => {
                 rating
               );
 
-              return await client.query(
+              return await pool.query(
                 "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
                 [id, updatedRating]
               );
@@ -991,21 +925,15 @@ const OrderController = () => {
       }
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const refuseOrder = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
       const userId = req.userId;
 
-      await client.connect();
-
-      const existingOrderQuery = await client.query(
+      const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
         [id]
       );
@@ -1020,7 +948,7 @@ const OrderController = () => {
         .filter((cleanerId) => +cleanerId !== +userId)
         .join(",");
 
-      const result = await client.query(
+      const result = await pool.query(
         `UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *`,
         [id, updatedCleanerIds]
       );
@@ -1030,7 +958,7 @@ const OrderController = () => {
         ? updatedOrder.cleaner_id.split(",")
         : [];
 
-      await removeOrderFromSchedule(existingOrder, userId, client);
+      await removeOrderFromSchedule(existingOrder, userId);
 
       res.status(200).json({
         ...updatedOrder,
@@ -1038,21 +966,15 @@ const OrderController = () => {
       });
     } catch (error) {
       res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
   const updateOrderExtraExpenses = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
       const { extraExpenses } = req.body;
 
-      await client.connect();
-
-      const result = await client.query(
+      const result = await pool.query(
         `UPDATE "order" SET extra_expenses = $2 WHERE id = $1 RETURNING *`,
         [id, extraExpenses]
       );
@@ -1068,8 +990,6 @@ const OrderController = () => {
       });
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
@@ -1118,16 +1038,12 @@ const OrderController = () => {
   };
 
   const connectPaymentIntent = async (req, res) => {
-    const client = getClient();
-
     try {
       const { id } = req.params;
 
-      await client.connect();
-
       const {
         rows: [existingOrder],
-      } = await client.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
 
       if (!existingOrder) {
         return res.status(404).json({ message: "Order doesn't exist" });
@@ -1142,7 +1058,7 @@ const OrderController = () => {
       try {
         const {
           rows: [connectedOrder],
-        } = await client.query(
+        } = await pool.query(
           `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
            and address = $4 and name = $5 and creation_date = $6)`,
           [
@@ -1176,7 +1092,7 @@ const OrderController = () => {
 
         const {
           rows: [updatedOrder],
-        } = await client.query(
+        } = await pool.query(
           `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
           [id, paymentIntent.id, PAYMENT_STATUS.PENDING]
         );
@@ -1186,7 +1102,7 @@ const OrderController = () => {
         if (connectedOrder) {
           const {
             rows: [updatedConnectedOrder],
-          } = await client.query(
+          } = await pool.query(
             `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
             [connectedOrder.id, paymentIntent.id, PAYMENT_STATUS.PENDING]
           );
@@ -1209,8 +1125,6 @@ const OrderController = () => {
       }
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
