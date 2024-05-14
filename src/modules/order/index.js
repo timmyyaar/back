@@ -35,6 +35,11 @@ orderRouter
     "/order/:id/payment-intent",
     verifyToken,
     orderController.connectPaymentIntent
+  )
+  .put(
+    "/order/:id/approve-payment",
+    verifyToken,
+    orderController.approvePayment
   );
 
 module.exports = orderRouter;
