@@ -242,7 +242,12 @@ const OrderController = () => {
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
+            await sendTelegramMessage(
+              date,
+              CREATED_ORDERS_CHANNEL_ID,
+              secTitle
+            );
           }
 
           return res
@@ -299,7 +304,7 @@ const OrderController = () => {
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
           }
 
           const createdOrder = result.rows[0];
