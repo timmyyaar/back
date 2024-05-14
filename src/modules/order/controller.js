@@ -701,7 +701,7 @@ const OrderController = () => {
         await sendFeedbackEmailAndSetReminder(
           updatedOrder,
           connectedOrder,
-          transporter,
+          transporter
         );
       }
 
@@ -994,17 +994,13 @@ const OrderController = () => {
   };
 
   const updateOrderInvoiceStatus = async (req, res) => {
-    const client = getClient();
-
     try {
       const id = req.params.id;
       const { isPaid } = req.body;
 
-      await client.connect();
-
       const {
         rows: [{ exists }],
-      } = await client.query(
+      } = await pool.query(
         'SELECT EXISTS(SELECT 1 FROM "order" WHERE id = $1)',
         [id]
       );
@@ -1017,7 +1013,7 @@ const OrderController = () => {
 
       const {
         rows: [updatedOrder],
-      } = await client.query(
+      } = await pool.query(
         `UPDATE "order" SET is_invoice_paid = $2 WHERE id = $1 RETURNING *`,
         [id, isPaid]
       );
@@ -1032,8 +1028,6 @@ const OrderController = () => {
       });
     } catch (error) {
       return res.status(500).json({ error });
-    } finally {
-      await client.end();
     }
   };
 
