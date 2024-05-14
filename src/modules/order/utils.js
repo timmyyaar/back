@@ -436,10 +436,19 @@ const sendTelegramMessage = async (date, channel, title) => {
   );
 };
 
+const getOrdersWithCleaners = (orders) =>
+  orders.map((order) => ({
+    ...order,
+    cleaner_id: order.cleaner_id
+      ? order.cleaner_id.split(",").map((cleanerId) => +cleanerId)
+      : [],
+  }));
+
 module.exports = {
   getSchedulePartsByOrder,
   getUpdatedScheduleDetailsForEdit,
   getUpdatedScheduleDetailsForDelete,
   getOrderCheckList,
   sendTelegramMessage,
+  getOrdersWithCleaners,
 };

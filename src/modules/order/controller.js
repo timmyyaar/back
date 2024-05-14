@@ -15,7 +15,11 @@ const { ORDER_TYPES, ROLES, PAYMENT_STATUS } = require("../../constants");
 
 const { getCleanerReward } = require("./price-utils");
 
-const { getOrderCheckList, sendTelegramMessage } = require("./utils");
+const {
+  getOrderCheckList,
+  sendTelegramMessage,
+  getOrdersWithCleaners,
+} = require("./utils");
 
 const {
   sendConfirmationEmailAndTelegramMessage,
@@ -57,13 +61,7 @@ const OrderController = () => {
     try {
       const result = await pool.query('SELECT * FROM "order" ORDER BY id DESC');
 
-      return res.json(
-        result.rows.map((item) => {
-          const cleaner_id = item.cleaner_id ? item.cleaner_id.split(",") : [];
-
-          return { ...item, cleaner_id: cleaner_id.map((item) => +item) };
-        })
-      );
+      return res.json(getOrdersWithCleaners(result.rows));
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -80,13 +78,7 @@ const OrderController = () => {
         [idsArray]
       );
 
-      return res.json(
-        result.rows.map((item) => {
-          const cleaner_id = item.cleaner_id ? item.cleaner_id.split(",") : [];
-
-          return { ...item, cleaner_id: cleaner_id.map((item) => +item) };
-        })
-      );
+      return res.json(getOrdersWithCleaners(result.rows));
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -183,10 +175,11 @@ const OrderController = () => {
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
               is_new_client, city, transportation_price, cleaners_count, language, 
-              creation_date, own_check_list, reward_original, payment_status, payment_intent, manual_cleaners_count) 
+              creation_date, own_check_list, reward_original, payment_status, payment_intent,
+              manual_cleaners_count, status) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36, $37), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36, $38) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36, $37, $39), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36, $38, $39) RETURNING *`,
             [
               name,
               number,
@@ -238,6 +231,7 @@ const OrderController = () => {
               paymentIntentId,
               mainServiceManualCleanersCount,
               secondServiceManualCleanersCount,
+              ORDER_STATUS.CREATED,
             ]
           );
 
@@ -261,9 +255,10 @@ const OrderController = () => {
              estimate, title, counter, subService, total_service_price, 
              price_original, total_service_price_original, additional_information, 
              is_new_client, city, transportation_price, cleaners_count, language, 
-             creation_date, own_check_list, reward_original, payment_status, payment_intent, manual_cleaners_count) 
+             creation_date, own_check_list, reward_original, payment_status, payment_intent,
+             manual_cleaners_count, status) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30) RETURNING *`,
             [
               name,
               number,
@@ -300,6 +295,7 @@ const OrderController = () => {
               onlinePayment ? PAYMENT_STATUS.PENDING : null,
               paymentIntentId,
               mainServiceManualCleanersCount,
+              ORDER_STATUS.CREATED,
             ]
           );
 
@@ -393,16 +389,6 @@ const OrderController = () => {
         return res.status(404).json({ message: "Order not found" });
       }
 
-      const {
-        rows: [connectedOrderInit],
-      } = await pool.query(
-        'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
-        [id, existingOrder.date, existingOrder.number, existingOrder.address]
-      );
-      let connectedOrder = connectedOrderInit
-        ? { ...connectedOrderInit }
-        : null;
-
       const isDryCleaningOrOzonation = [
         ORDER_TYPES.DRY,
         ORDER_TYPES.OZONATION,
@@ -416,46 +402,21 @@ const OrderController = () => {
         ? JSON.stringify(getOrderCheckList(existingOrder))
         : existingOrder.check_list;
 
-      const needToApprovePayment =
-        isApprovedStatus &&
-        !existingOrder.is_confirmed &&
-        existingOrder.payment_intent &&
-        existingOrder.payment_status ===
-          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
-
-      if (needToApprovePayment) {
-        await stripe.paymentIntents.capture(existingOrder.payment_intent);
-
-        if (connectedOrder) {
-          const {
-            rows: [approvedConnectedOrder],
-          } = await pool.query(
-            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
-          );
-
-          connectedOrder = { ...approvedConnectedOrder };
-        }
-      }
-
       const result = await pool.query(
         `UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4,
-         is_confirmed = $5, payment_status = $6 WHERE id = $1 RETURNING *`,
+         is_confirmed = $5 WHERE id = $1 RETURNING *`,
         [
           id,
           cleanerId.join(","),
           isApprovedStatus ? "approved" : "created",
           updatedCheckList,
           isApprovedStatus ? true : existingOrder.is_confirmed,
-          needToApprovePayment
-            ? PAYMENT_STATUS.CONFIRMED
-            : existingOrder.payment_status,
         ]
       );
 
       await updateScheduleForMultipleCleaners(existingOrder, cleanerId);
 
-      const updatedOrder = { ...result.rows[0] };
+      const updatedOrder = result.rows[0];
 
       if (isApprovedStatus) {
         const { rows: locales } = await pool.query("SELECT * FROM locales");
@@ -468,18 +429,9 @@ const OrderController = () => {
         );
       }
 
-      const updatedOrders = connectedOrder
-        ? [updatedOrder, connectedOrder]
-        : [updatedOrder];
+      const updatedOrders = [updatedOrder];
 
-      return res.status(200).json(
-        updatedOrders.map((item) => ({
-          ...item,
-          cleaner_id: item.cleaner_id
-            ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
-            : [],
-        }))
-      );
+      return res.status(200).json(getOrdersWithCleaners(updatedOrders));
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -547,16 +499,10 @@ const OrderController = () => {
         [id, [...existingCleanerId, cleanerId].join(",")]
       );
       const updatedOrder = result.rows[0];
-      const updatedOrderCleanerId = updatedOrder.cleaner_id
-        ? updatedOrder.cleaner_id.split(",")
-        : [];
 
       await addOrderToSchedule(existingOrder, cleanerId);
 
-      res.status(200).json({
-        ...updatedOrder,
-        cleaner_id: updatedOrderCleanerId.map((item) => +item),
-      });
+      res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
     } catch (error) {
       res.status(500).json({ error });
     }
@@ -624,16 +570,6 @@ const OrderController = () => {
           PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
           PAYMENT_STATUS.PENDING,
         ].includes(existingOrder.payment_status);
-      const needToApprovePayment =
-        status === ORDER_STATUS.APPROVED &&
-        existingOrder.payment_intent &&
-        existingOrder.payment_status ===
-          PAYMENT_STATUS.WAITING_FOR_CONFIRMATION &&
-        !existingOrder.is_confirmed;
-
-      if (needToApprovePayment) {
-        await stripe.paymentIntents.capture(existingOrder.payment_intent);
-      }
 
       if (needToCancelPayment) {
         await stripe.paymentIntents.cancel(existingOrder.payment_intent);
@@ -652,8 +588,6 @@ const OrderController = () => {
           status === ORDER_STATUS.APPROVED ? true : existingOrder.is_confirmed,
           needToCancelPayment
             ? PAYMENT_STATUS.CANCELED
-            : needToApprovePayment
-            ? PAYMENT_STATUS.CONFIRMED
             : existingOrder.payment_status,
         ]
       );
@@ -667,9 +601,7 @@ const OrderController = () => {
           status === ORDER_STATUS.CLOSED
             ? ORDER_STATUS.CLOSED
             : connectedOrder.status;
-        const updatedConnectedOrderPaymentStatus = needToApprovePayment
-          ? PAYMENT_STATUS.CONFIRMED
-          : needToCancelPayment
+        const updatedConnectedOrderPaymentStatus = needToCancelPayment
           ? PAYMENT_STATUS.CANCELED
           : connectedOrder.payment_status;
 
@@ -718,14 +650,7 @@ const OrderController = () => {
         ? [updatedOrder, updatedConnectedOrder]
         : [updatedOrder];
 
-      return res.status(200).json(
-        updatedOrders.map((item) => ({
-          ...item,
-          cleaner_id: item.cleaner_id
-            ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
-            : [],
-        }))
-      );
+      return res.status(200).json(getOrdersWithCleaners(updatedOrders));
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -857,14 +782,7 @@ const OrderController = () => {
         updatedOrdersResult.push({ ...updatedConnectedOrder });
       }
 
-      return res.status(200).json(
-        updatedOrdersResult.map((item) => ({
-          ...item,
-          cleaner_id: item.cleaner_id
-            ? item.cleaner_id.split(",").map((cleanerId) => +cleanerId)
-            : [],
-        }))
-      );
+      return res.status(200).json(getOrdersWithCleaners(updatedOrdersResult));
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -917,14 +835,7 @@ const OrderController = () => {
           })
         );
 
-        const updatedOrderCleanerId = updatedOrder.cleaner_id
-          ? updatedOrder.cleaner_id.split(",")
-          : [];
-
-        res.status(200).json({
-          ...updatedOrder,
-          cleaner_id: updatedOrderCleanerId.map((item) => +item),
-        });
+        res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
       } else {
         res.status(409).json({ message: "Feedback was already sent" });
       }
@@ -959,16 +870,10 @@ const OrderController = () => {
       );
 
       const updatedOrder = result.rows[0];
-      const updatedOrderCleanerId = updatedOrder.cleaner_id
-        ? updatedOrder.cleaner_id.split(",")
-        : [];
 
       await removeOrderFromSchedule(existingOrder, userId);
 
-      res.status(200).json({
-        ...updatedOrder,
-        cleaner_id: updatedOrderCleanerId.map((item) => +item),
-      });
+      res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
     } catch (error) {
       res.status(500).json({ error });
     }
@@ -985,14 +890,8 @@ const OrderController = () => {
       );
 
       const updatedOrder = result.rows[0];
-      const updatedOrderCleanerId = updatedOrder.cleaner_id
-        ? updatedOrder.cleaner_id.split(",")
-        : [];
 
-      return res.status(200).json({
-        ...updatedOrder,
-        cleaner_id: updatedOrderCleanerId.map((item) => +item),
-      });
+      return res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -1023,14 +922,7 @@ const OrderController = () => {
         [id, isPaid]
       );
 
-      const updatedOrderCleanerId = updatedOrder.cleaner_id
-        ? updatedOrder.cleaner_id.split(",")
-        : [];
-
-      return res.status(200).json({
-        ...updatedOrder,
-        cleaner_id: updatedOrderCleanerId.map((item) => +item),
-      });
+      return res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -1109,18 +1001,70 @@ const OrderController = () => {
           updatedOrdersResult.push({ ...updatedConnectedOrder });
         }
 
-        return res.status(200).json(
-          updatedOrdersResult.map((order) => ({
-            ...order,
-            cleaner_id: order.cleaner_id
-              ? order.cleaner_id.split(",").map((item) => +item)
-              : [],
-          }))
-        );
+        return res.status(200).json(getOrdersWithCleaners(updatedOrdersResult));
       } catch (error) {
         return res
           .status(404)
           .json({ message: "Payment intent doesn't exist" });
+      }
+    } catch (error) {
+      return res.status(500).json({ error });
+    }
+  };
+
+  const approvePayment = async (req, res) => {
+    const { id } = req.params;
+
+    const {
+      rows: [existingOrder],
+    } = await pool.query('SELECT * FROM "order" WHERE (id = $1)', [id]);
+
+    if (!existingOrder) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const {
+      rows: [connectedOrder],
+    } = await pool.query(
+      `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
+           and address = $4 and name = $5 and creation_date = $6)`,
+      [
+        id,
+        existingOrder.date,
+        existingOrder.number,
+        existingOrder.address,
+        existingOrder.name,
+        existingOrder.creation_date,
+      ]
+    );
+
+    try {
+      if (
+        existingOrder.payment_status === PAYMENT_STATUS.WAITING_FOR_CONFIRMATION
+      ) {
+        await stripe.paymentIntents.capture(existingOrder.payment_intent);
+
+        const {
+          rows: [updatedOrder],
+        } = await pool.query(
+          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+          [existingOrder.id, PAYMENT_STATUS.CONFIRMED]
+        );
+
+        const updatedOrdersResult = [updatedOrder];
+
+        if (connectedOrder) {
+          const {
+            rows: [approvedConnectedOrder],
+          } = await pool.query(
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
+          );
+
+          updatedOrdersResult.push(approvedConnectedOrder);
+        }
+
+        return res.status(200).json(getOrdersWithCleaners(updatedOrdersResult));
       }
     } catch (error) {
       return res.status(500).json({ error });
@@ -1141,6 +1085,7 @@ const OrderController = () => {
     updateOrderExtraExpenses,
     updateOrderInvoiceStatus,
     connectPaymentIntent,
+    approvePayment,
   };
 };
 
