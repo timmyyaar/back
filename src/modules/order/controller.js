@@ -242,7 +242,7 @@ const OrderController = () => {
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            //await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
           }
 
           return res
@@ -299,7 +299,7 @@ const OrderController = () => {
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            //await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
+            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID);
           }
 
           const createdOrder = result.rows[0];
@@ -452,16 +452,16 @@ const OrderController = () => {
 
       const updatedOrder = { ...result.rows[0] };
 
-      // if (isApprovedStatus) {
-      //   const { rows: locales } = await pool.query("SELECT * FROM locales");
-      //
-      //   await sendConfirmationEmailAndTelegramMessage(
-      //     existingOrder,
-      //     updatedCheckList,
-      //     locales,
-      //     transporter
-      //   );
-      // }
+      if (isApprovedStatus) {
+        const { rows: locales } = await pool.query("SELECT * FROM locales");
+
+        await sendConfirmationEmailAndTelegramMessage(
+          existingOrder,
+          updatedCheckList,
+          locales,
+          transporter
+        );
+      }
 
       const updatedOrders = connectedOrder
         ? [updatedOrder, connectedOrder]
@@ -685,25 +685,25 @@ const OrderController = () => {
 
       const updatedOrder = { ...result.rows[0] };
 
-      // if (status === ORDER_STATUS.APPROVED) {
-      //   const { rows: locales } = await pool.query("SELECT * FROM locales");
-      //
-      //   await sendConfirmationEmailAndTelegramMessage(
-      //     existingOrder,
-      //     updatedCheckList,
-      //     locales,
-      //     transporter,
-      //     true
-      //   );
-      // }
+      if (status === ORDER_STATUS.APPROVED) {
+        const { rows: locales } = await pool.query("SELECT * FROM locales");
 
-      // if (status === ORDER_STATUS.DONE) {
-      //   await sendFeedbackEmailAndSetReminder(
-      //     updatedOrder,
-      //     connectedOrder,
-      //     transporter
-      //   );
-      // }
+        await sendConfirmationEmailAndTelegramMessage(
+          existingOrder,
+          updatedCheckList,
+          locales,
+          transporter,
+          true
+        );
+      }
+
+      if (status === ORDER_STATUS.DONE) {
+        await sendFeedbackEmailAndSetReminder(
+          updatedOrder,
+          connectedOrder,
+          transporter
+        );
+      }
 
       const updatedConnectedOrder = connectedOrder
         ? await getUpdatedConnectedOrder()
