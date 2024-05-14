@@ -22,7 +22,7 @@ const getOrigin = () => {
         "https://www.admin-staging.takeutime.pl",
       ];
     default:
-      return ["http://localhost:3001"];
+      return ["http://localhost:3000", "http://localhost:3001"];
   }
 };
 
