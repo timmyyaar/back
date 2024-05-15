@@ -2,6 +2,8 @@ const pool = require("../../db/pool");
 
 const constants = require("../../constants");
 
+const env = require("../../helpers/environments");
+
 const CREATED_ORDERS_CHANNEL_ID = "-1002017671793";
 
 const sendTelegramMessage = async () => {
@@ -43,7 +45,9 @@ const CareersController = () => {
           [name, phone, email, about, referralCode]
         );
 
-        await sendTelegramMessage();
+        if (env.getEnvironment("MODE") === "prod") {
+          await sendTelegramMessage();
+        }
 
         return res.status(200).json(result.rows[0]);
       } else {
