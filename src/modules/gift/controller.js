@@ -20,7 +20,7 @@ const GiftController = () => {
         [email, phone, comment]
       );
 
-      res.status(200).json({ gift: result.rows[0] });
+      res.status(200).json(result.rows[0]);
     } catch (error) {
       res.status(500).json({ error });
     }
