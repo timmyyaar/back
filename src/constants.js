@@ -36,10 +36,15 @@ const PAYMENT_STATUS = {
   CANCELED: "canceled",
 };
 
+const STRIPE_PAYMENT_STATUS = {
+  REQUIRES_CAPTURE: "requires_capture",
+};
+
 module.exports = {
   EMAIL_REGEX,
   BRACKETS_REGEX,
   ROLES,
   ORDER_TYPES,
   PAYMENT_STATUS,
+  STRIPE_PAYMENT_STATUS,
 };
