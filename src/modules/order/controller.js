@@ -11,7 +11,12 @@ const {
   getDateTimeObjectFromString,
 } = require("../../utils");
 
-const { ORDER_TYPES, ROLES, PAYMENT_STATUS } = require("../../constants");
+const {
+  ORDER_TYPES,
+  ROLES,
+  PAYMENT_STATUS,
+  STRIPE_PAYMENT_STATUS,
+} = require("../../constants");
 
 const { getCleanerReward } = require("./price-utils");
 
@@ -1012,6 +1017,75 @@ const OrderController = () => {
     }
   };
 
+  const syncOrderPaymentIntent = async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const {
+        rows: [existingOrder],
+      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+
+      if (!existingOrder || !existingOrder.payment_intent) {
+        return res.status(404).json({ message: "Order payment doesn't exist" });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        existingOrder.payment_intent
+      );
+
+      const needToSyncStatuses =
+        paymentIntent.status === STRIPE_PAYMENT_STATUS.REQUIRES_CAPTURE &&
+        existingOrder.status !== PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
+
+      if (needToSyncStatuses) {
+        const {
+          rows: [updatedOrder],
+        } = await pool.query(
+          `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
+          [id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION]
+        );
+
+        const updatedOrdersResult = [{ ...updatedOrder }];
+
+        const {
+          rows: [connectedOrder],
+        } = await pool.query(
+          `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
+           and address = $4 and name = $5 and creation_date = $6)`,
+          [
+            id,
+            existingOrder.date,
+            existingOrder.number,
+            existingOrder.address,
+            existingOrder.name,
+            existingOrder.creation_date,
+          ]
+        );
+
+        if (connectedOrder) {
+          const {
+            rows: [updatedConnectedOrder],
+          } = await pool.query(
+            `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
+            [connectedOrder.id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION]
+          );
+
+          updatedOrdersResult.push({ ...updatedConnectedOrder });
+        }
+
+        return res.status(200).json({
+          isSynced: false,
+          updatedOrders: getOrdersWithCleaners(updatedOrdersResult),
+        });
+      } else {
+        return res.status(200).json({ isSynced: true });
+      }
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error });
+    }
+  };
+
   const approvePayment = async (req, res) => {
     const { id } = req.params;
 
@@ -1085,6 +1159,7 @@ const OrderController = () => {
     updateOrderExtraExpenses,
     updateOrderInvoiceStatus,
     connectPaymentIntent,
+    syncOrderPaymentIntent,
     approvePayment,
   };
 };

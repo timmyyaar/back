@@ -37,6 +37,11 @@ orderRouter
     orderController.connectPaymentIntent
   )
   .put(
+    "/order/:id/sync-payment",
+    verifyToken,
+    orderController.syncOrderPaymentIntent
+  )
+  .put(
     "/order/:id/approve-payment",
     verifyToken,
     orderController.approvePayment
