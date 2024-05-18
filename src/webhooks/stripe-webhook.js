@@ -1,4 +1,4 @@
-const pool = require("../db/pool");
+const { Client } = require("pg");
 
 const env = require("../helpers/environments");
 const { PAYMENT_STATUS } = require("../constants");
@@ -6,6 +6,7 @@ const { PAYMENT_STATUS } = require("../constants");
 const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
 
 const webhookSecret = env.getEnvironment("STRIPE_WEBHOOK_SECRET");
+const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
 
 const stripeWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
@@ -32,12 +33,18 @@ const stripeWebhook = async (req, res) => {
 
     const paymentIntentMetadata = event.data.object.metadata;
 
+    const client = new Client({
+      connectionString: `${POSTGRES_URL}?sslmode=require`,
+    });
+
+    await client.connect();
+
     if (paymentIntentMetadata.employeePaymentId) {
       const employeePaymentId = paymentIntentMetadata.employeePaymentId;
 
       const {
         rows: [payment],
-      } = await pool.query("SELECT * FROM payments WHERE id = $1", [
+      } = await client.query("SELECT * FROM payments WHERE id = $1", [
         +employeePaymentId,
       ]);
 
@@ -45,7 +52,7 @@ const stripeWebhook = async (req, res) => {
         return Promise.resolve();
       }
 
-      await pool.query(
+      await client.query(
         "UPDATE payments SET is_paid = $2, is_failed = $3 WHERE id = $1 RETURNING *",
         [+employeePaymentId, isPaymentSucceeded, isPaymentFailed]
       );
@@ -56,7 +63,7 @@ const stripeWebhook = async (req, res) => {
 
       await Promise.all(
         orderIds.map(async (id) => {
-          const orderQuery = await pool.query(
+          const orderQuery = await client.query(
             'SELECT * FROM "order" WHERE id = $1',
             [id]
           );
@@ -68,7 +75,7 @@ const stripeWebhook = async (req, res) => {
             return Promise.resolve();
           }
 
-          await pool.query(
+          await client.query(
             'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
             [
               id,
@@ -82,6 +89,8 @@ const stripeWebhook = async (req, res) => {
     }
   } catch (error) {
     return res.status(500).json({ error, received: true });
+  } finally {
+    await client.end();
   }
 };
 
