@@ -37,9 +37,9 @@ const stripeWebhook = async (req, res) => {
       connectionString: `${POSTGRES_URL}?sslmode=require`,
     });
 
-    await client.connect();
-
     try {
+      await client.connect();
+
       if (paymentIntentMetadata.employeePaymentId) {
         const employeePaymentId = paymentIntentMetadata.employeePaymentId;
 
