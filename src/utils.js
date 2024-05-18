@@ -28,23 +28,22 @@ const getDateTimeString = (date) => {
 };
 
 const getDateTimeObjectFromString = (string) => {
-  const dateString = string.match(/([^\s]+)/)[0];
-  const timeString = string.slice(-5);
+  const dateAndTime = string.split(" ");
+  const dateString = dateAndTime[0];
+  const timeString = dateAndTime[1];
 
-  const endTimeDay = dateString.match(/.+?(?=\/)/)[0];
-  const endTimeMonth = dateString.slice(-7, -5);
-  const endTimeYear = dateString.slice(-4);
-  const endTimeHours = timeString.slice(-5, -3);
-  const endTimeMinutes = timeString.slice(-2);
+  const [day, month, year] = dateString.split("/");
+  const [hours, minutes] = timeString.split(":");
 
-  const providedDateString = `${endTimeYear}-${endTimeMonth}-${endTimeDay} ${endTimeHours}:${endTimeMinutes}`;
-
-  return new Date(providedDateString);
+  return new Date(+year, +month - 1, +day, +hours, +minutes);
 };
+
+const getFloatOneDigit = (number) => Number(number.toFixed(1));
 
 module.exports = {
   getUpdatedUserRating,
   capitalizeFirstLetter,
   getDateTimeString,
   getDateTimeObjectFromString,
+  getFloatOneDigit,
 };

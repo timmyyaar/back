@@ -135,6 +135,8 @@ const UsersController = () => {
         email: user.email,
         rating: user.rating,
         role: user.role,
+        firstName: user.first_name,
+        lastName: user.last_name,
       });
     } catch (error) {
       res.status(500).json({ error });
