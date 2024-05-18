@@ -38,7 +38,7 @@ const stripeWebhook = async (req, res) => {
       const {
         rows: [payment],
       } = await pool.query("SELECT * FROM payments WHERE id = $1", [
-        employeePaymentId,
+        +employeePaymentId,
       ]);
 
       if (!payment) {
@@ -47,7 +47,7 @@ const stripeWebhook = async (req, res) => {
 
       await pool.query(
         "UPDATE payments SET is_paid = $2, is_failed = $3 WHERE id = $1 RETURNING *",
-        [employeePaymentId, isPaymentSucceeded, isPaymentFailed]
+        [+employeePaymentId, isPaymentSucceeded, isPaymentFailed]
       );
     } else if (paymentIntentMetadata.orderIds) {
       const orderIds =
