@@ -26,7 +26,7 @@ const stripeWebhook = async (req, res) => {
     const isPaymentSucceeded = event.type === "payment_intent.succeeded";
     const isPaymentFailed = event.type === "payment_intent.payment_failed";
 
-    if (!isPaymentFailed && !isPaymentCaptured && !isPaymentCaptured) {
+    if (!isPaymentFailed && !isPaymentSucceeded && !isPaymentCaptured) {
       return;
     }
 
