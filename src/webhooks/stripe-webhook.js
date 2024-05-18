@@ -23,14 +23,43 @@ const stripeWebhook = async (req, res) => {
 
     const isPaymentCaptured =
       event.type === "payment_intent.amount_capturable_updated";
+    const isPaymentSucceeded =
+      event.type === "payment_intent.payment_intent.succeeded";
     const isPaymentFailed = event.type === "payment_intent.payment_failed";
 
-    if (isPaymentCaptured || isPaymentFailed) {
-      const paymentIntent = event.data.object;
+    if (!isPaymentFailed && !isPaymentCaptured && !isPaymentCaptured) {
+      return res.status(400).json({ message: "Incorrect payment status" });
+    }
+
+    const paymentIntentMetadata = event.data.object.metadata;
+
+    if (paymentIntentMetadata.employeePaymentId) {
+      const employeePaymentId = paymentIntentMetadata.employeePaymentId;
+
+      try {
+        const {
+          rows: [payment],
+        } = await pool.query("SELECT * FROM payments WHERE id = $1", [
+          employeePaymentId,
+        ]);
+
+        if (!payment) {
+          return Promise.resolve();
+        }
+
+        await pool.query(
+          "UPDATE payments SET is_paid = $2, is_failed = $3 WHERE id = $1 RETURNING *",
+          [employeePaymentId, isPaymentSucceeded, isPaymentFailed]
+        );
+      } catch (error) {
+        return res.status(500).json({
+          message: "Event was catched successfully, but some DB error occurred",
+        });
+      }
+    } else if (paymentIntentMetadata.orderIds) {
       const orderIds =
-        paymentIntent.metadata.orderIds
-          ?.split(",")
-          ?.map((orderId) => +orderId) || [];
+        paymentIntentMetadata.orderIds.split(",").map((orderId) => +orderId) ||
+        [];
 
       try {
         await Promise.all(
@@ -59,14 +88,13 @@ const stripeWebhook = async (req, res) => {
           })
         );
       } catch (error) {
-        return res
-          .status(500)
-          .json({
-            message:
-              "Event was catched successfully, but some DB error occurred",
-          });
+        return res.status(500).json({
+          message: "Event was catched successfully, but some DB error occurred",
+        });
       }
     }
+
+    return res.status(200).json({ message: "Catched" });
   } catch (error) {
     return res.status(500).json({ error, received: true });
   }

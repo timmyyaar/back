@@ -5,14 +5,15 @@ const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
 
 const PaymentController = () => {
   const createPaymentIntent = async (req, res) => {
-    const { price, email, metadata } = req.body;
+    const { price, email, metadata, description, isAutoCapture } = req.body;
 
     try {
       const intent = await stripe.paymentIntents.create({
         amount: Math.round(price * 100),
         currency: "pln",
-        capture_method: "manual",
         receipt_email: email,
+        ...(!isAutoCapture && { capture_method: "manual" }),
+        ...(description && { description }),
         ...(metadata && { metadata }),
       });
 
