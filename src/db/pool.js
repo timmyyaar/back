@@ -8,6 +8,8 @@ const pool = new Pool({
   connectionString: `${POSTGRES_URL}?sslmode=require`,
   idleTimeoutMillis: 0,
   connectionTimeoutMillis: 0,
+  createTimeoutMillis: 0,
+  acquireTimeoutMillis: 0,
   keepAlive: true,
 });
 
