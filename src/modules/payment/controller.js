@@ -87,12 +87,58 @@ const PaymentController = () => {
     }
   };
 
+  const getCustomerPaymentMethods = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const paymentMethods = await stripe.customers.listPaymentMethods(id);
+
+      return res.status(200).json(paymentMethods);
+    } catch (error) {
+      return res.status(404).json({ message: error.raw.message });
+    }
+  };
+
+  const setupFutureUsage = async (req, res) => {
+    const { id } = req.params;
+    const { setupFutureUsage } = req.body;
+
+    try {
+      await stripe.paymentIntents.update(id, {
+        setup_future_usage: setupFutureUsage,
+      });
+
+      return res.status(200).json({
+        message: `Saved for future usage`,
+      });
+    } catch (error) {
+      return res.status(400).json({ message: error.raw.message });
+    }
+  };
+
+  const detachPaymentMethod = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      await stripe.paymentMethods.detach(id);
+
+      return res.status(200).json({
+        message: "Payment method was detached",
+      });
+    } catch (error) {
+      return res.status(400).json({ message: error.raw.message });
+    }
+  };
+
   return {
     createPaymentIntent,
     updatePaymentIntent,
     cancelPaymentIntent,
     capturePayment,
     getPaymentIntent,
+    getCustomerPaymentMethods,
+    setupFutureUsage,
+    detachPaymentMethod,
   };
 };
 

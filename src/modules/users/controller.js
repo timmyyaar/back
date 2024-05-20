@@ -135,6 +135,12 @@ const UsersController = () => {
         email: user.email,
         rating: user.rating,
         role: user.role,
+<<<<<<< Updated upstream
+=======
+        firstName: user.first_name,
+        lastName: user.last_name,
+        customerId: user.customer_id,
+>>>>>>> Stashed changes
       });
     } catch (error) {
       res.status(500).json({ error });
