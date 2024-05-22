@@ -164,7 +164,6 @@ const EmployeePaymentsController = () => {
         }
       }
     } catch (error) {
-      console.log(error)
       return res.status(500).json({ error });
     }
   };
@@ -183,7 +182,7 @@ const EmployeePaymentsController = () => {
           .json({ message: "Employee payment doesn't exist" });
       }
 
-      if (!existingPayment.payment_intent) {
+      if (!existingPayment.payment_intent && existingPayment.amount > 0) {
         return res
           .status(422)
           .json({ message: "You can't finish payment with amount > 0" });
