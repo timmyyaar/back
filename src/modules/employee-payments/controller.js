@@ -14,18 +14,18 @@ const {
 const { ORDER_STATUS } = require("../order/constants");
 
 const getLastPaymentPeriod = () => {
-  const lastFriday = new Date();
+  const lastTuesday = new Date();
 
-  lastFriday.setDate(lastFriday.getDate() - ((lastFriday.getDay() + 2) % 7));
-  lastFriday.setHours(0, 0, 0, 0);
+  lastTuesday.setDate(lastTuesday.getDate() - ((lastTuesday.getDay() + 5) % 7));
+  lastTuesday.setHours(0, 0, 0, 0);
 
-  const prevFriday = new Date(
-    new Date(lastFriday).setDate(lastFriday.getDate() - 7)
+  const prevTuesday = new Date(
+    new Date(lastTuesday).setDate(lastTuesday.getDate() - 7)
   );
 
   return {
-    lastFriday,
-    prevFriday,
+    lastTuesday,
+    prevTuesday,
   };
 };
 
@@ -71,15 +71,15 @@ const EmployeePaymentsController = () => {
     const { email, firstName, lastName, customerId } = req.body;
 
     try {
-      const { lastFriday, prevFriday } = getLastPaymentPeriod();
-      const lastFridayString = getDateTimeString(lastFriday);
-      const prevFridayString = getDateTimeString(prevFriday);
+      const { lastTuesday, prevTuesday } = getLastPaymentPeriod();
+      const lastTuesdayString = getDateTimeString(lastTuesday);
+      const prevTuesdayString = getDateTimeString(prevTuesday);
 
       const {
         rows: [{ exists }],
       } = await pool.query(
         "SELECT EXISTS(SELECT 1 FROM payments WHERE employee_id = $1 AND period_start = $2 AND period_end = $3)",
-        [userId, prevFridayString, lastFridayString]
+        [userId, prevTuesdayString, lastTuesdayString]
       );
 
       if (exists) {
@@ -98,8 +98,8 @@ const EmployeePaymentsController = () => {
               .split(",")
               .map((id) => +id)
               .some((id) => userId === id) &&
-            getDateTimeObjectFromString(date) > prevFriday &&
-            getDateTimeObjectFromString(date) < lastFriday
+            getDateTimeObjectFromString(date) > prevTuesday &&
+            getDateTimeObjectFromString(date) < lastTuesday
         );
         const orderIdsForLastPeriod = ordersForLastPeriod
           .map(({ id }) => id)
@@ -130,8 +130,8 @@ const EmployeePaymentsController = () => {
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [
               userId,
-              prevFridayString,
-              lastFridayString,
+              prevTuesdayString,
+              lastTuesdayString,
               orderIdsForLastPeriod,
               amountToPay,
               `${firstName} ${lastName}`,
@@ -144,8 +144,8 @@ const EmployeePaymentsController = () => {
               currency: "pln",
               receipt_email: email,
               description: `Employee ${firstName} ${lastName} payment for ${getDateWithoutTimeString(
-                prevFridayString
-              )} - ${getDateWithoutTimeString(lastFridayString)} period`,
+                prevTuesdayString
+              )} - ${getDateWithoutTimeString(lastTuesdayString)} period`,
               metadata: { employeePaymentId: createdPaymentPeriod.id },
               ...(customerId && { customer: customerId }),
             });
