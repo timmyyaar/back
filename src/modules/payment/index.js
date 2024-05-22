@@ -22,6 +22,11 @@ paymentRouter
     verifyToken,
     paymentController.getCustomerPaymentMethods
   )
+  .put(
+    "/payment-methods/:id",
+    verifyToken,
+    paymentController.updatePaymentMethod
+  )
   .patch(
     "/payment-methods/:id/detach",
     verifyToken,

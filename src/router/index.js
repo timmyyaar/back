@@ -14,6 +14,7 @@ const scheduleRouter = require("../modules/schedule");
 const blogsRouter = require("../modules/blogs");
 const pricesRouter = require("../modules/prices");
 const paymentRouter = require("../modules/payment");
+const employeePaymentsRouter = require("../modules/employee-payments");
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router
   .use(scheduleRouter)
   .use(blogsRouter)
   .use(pricesRouter)
-  .use(paymentRouter);
+  .use(paymentRouter)
+  .use(employeePaymentsRouter);
 
 module.exports = router;

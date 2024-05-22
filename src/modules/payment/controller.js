@@ -130,6 +130,21 @@ const PaymentController = () => {
     }
   };
 
+  const updatePaymentMethod = async (req, res) => {
+    const { id } = req.params;
+    const { metadata } = req.body;
+
+    try {
+      await stripe.paymentMethods.update(id, { metadata });
+
+      return res.status(200).json({
+        message: "Payment method was updated",
+      });
+    } catch (error) {
+      return res.status(400).json({ message: error.raw.message });
+    }
+  };
+
   return {
     createPaymentIntent,
     updatePaymentIntent,
@@ -139,6 +154,7 @@ const PaymentController = () => {
     getCustomerPaymentMethods,
     setupFutureUsage,
     detachPaymentMethod,
+    updatePaymentMethod,
   };
 };
 
