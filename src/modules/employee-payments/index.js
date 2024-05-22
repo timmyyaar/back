@@ -12,6 +12,11 @@ employeePaymentsRouter
     verifyToken,
     employeePaymentsController.getMyPayments
   )
+  .get(
+    "/employee-payments/all",
+    verifyToken,
+    employeePaymentsController.getAllPayments
+  )
   .post(
     "/employee-payments",
     verifyToken,

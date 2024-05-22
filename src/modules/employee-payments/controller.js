@@ -1,4 +1,9 @@
 const pool = require("../../db/pool");
+const env = require("../../helpers/environments");
+
+const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
+
+const constants = require("../../constants");
 
 const {
   getDateTimeString,
@@ -24,14 +29,35 @@ const getLastPaymentPeriod = () => {
   };
 };
 
+const getDateWithoutTimeString = (dateTimeString) =>
+  dateTimeString.slice(0, dateTimeString.indexOf(" "));
+
 const EmployeePaymentsController = () => {
   const getMyPayments = async (req, res) => {
     const { userId } = req;
 
     try {
       const result = await pool.query(
-        "SELECT * FROM payments WHERE employee_id = $1",
+        "SELECT * FROM payments WHERE employee_id = $1 ORDER BY id DESC",
         [userId]
+      );
+
+      return res.status(200).json(result.rows);
+    } catch (error) {
+      return res.status(500).json({ error });
+    }
+  };
+
+  const getAllPayments = async (req, res) => {
+    const { role } = req;
+
+    if (role !== constants.ROLES.ADMIN) {
+      return res.status(403).json({ message: "You don't have access to this" });
+    }
+
+    try {
+      const result = await pool.query(
+        "SELECT * FROM payments ORDER BY id DESC"
       );
 
       return res.status(200).json(result.rows);
@@ -42,6 +68,7 @@ const EmployeePaymentsController = () => {
 
   const createLastWeekPayment = async (req, res) => {
     const { userId } = req;
+    const { email, firstName, lastName, customerId } = req.body;
 
     try {
       const { lastFriday, prevFriday } = getLastPaymentPeriod();
@@ -99,21 +126,45 @@ const EmployeePaymentsController = () => {
           const {
             rows: [createdPaymentPeriod],
           } = await pool.query(
-            `INSERT INTO payments (employee_id, period_start, period_end, order_ids, amount)
-           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            `INSERT INTO payments (employee_id, period_start, period_end, order_ids, amount, employee_name)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [
               userId,
               prevFridayString,
               lastFridayString,
               orderIdsForLastPeriod,
               amountToPay,
+              `${firstName} ${lastName}`,
             ]
           );
 
-          return res.status(200).json(createdPaymentPeriod);
+          if (amountToPay > 0) {
+            const intent = await stripe.paymentIntents.create({
+              amount: Math.round(amountToPay * 100),
+              currency: "pln",
+              receipt_email: email,
+              description: `Employee ${firstName} ${lastName} payment for ${getDateWithoutTimeString(
+                prevFridayString
+              )} - ${getDateWithoutTimeString(lastFridayString)} period`,
+              metadata: { employeePaymentId: createdPaymentPeriod.id },
+              ...(customerId && { customer: customerId }),
+            });
+
+            const {
+              rows: [updatedPaymentPeriod],
+            } = await pool.query(
+              `UPDATE payments SET payment_intent = $2, client_secret = $3 WHERE id = $1 RETURNING *`,
+              [createdPaymentPeriod.id, intent.id, intent.client_secret]
+            );
+
+            return res.status(200).json(updatedPaymentPeriod);
+          } else {
+            return res.status(200).json(createdPaymentPeriod);
+          }
         }
       }
     } catch (error) {
+      console.log(error)
       return res.status(500).json({ error });
     }
   };
@@ -122,10 +173,9 @@ const EmployeePaymentsController = () => {
     const { id } = req.params;
 
     try {
-      const existingPayment = await pool.query(
-        "SELECT * FROM payments WHERE id = $1",
-        [id]
-      );
+      const {
+        rows: [existingPayment],
+      } = await pool.query("SELECT * FROM payments WHERE id = $1", [id]);
 
       if (!existingPayment) {
         return res
@@ -133,7 +183,7 @@ const EmployeePaymentsController = () => {
           .json({ message: "Employee payment doesn't exist" });
       }
 
-      if (existingPayment.amount > 0) {
+      if (!existingPayment.payment_intent) {
         return res
           .status(422)
           .json({ message: "You can't finish payment with amount > 0" });
@@ -154,6 +204,7 @@ const EmployeePaymentsController = () => {
 
   return {
     getMyPayments,
+    getAllPayments,
     createLastWeekPayment,
     finishPayment,
   };
