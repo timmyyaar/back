@@ -19,54 +19,57 @@ const stripeWebhook = async (req, res) => {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    res.status(200).json({ received: true });
-
     const isPaymentCaptured =
       event.type === "payment_intent.amount_capturable_updated";
+    const isPaymentSucceeded = event.type === "payment_intent.succeeded";
     const isPaymentFailed = event.type === "payment_intent.payment_failed";
 
-    if (isPaymentCaptured || isPaymentFailed) {
-      const paymentIntent = event.data.object;
-      const orderIds =
-        paymentIntent.metadata.orderIds
-          ?.split(",")
-          ?.map((orderId) => +orderId) || [];
-
-      try {
-        await Promise.all(
-          orderIds.map(async (id) => {
-            const orderQuery = await pool.query(
-              'SELECT * FROM "order" WHERE id = $1',
-              [id]
-            );
-            const order = orderQuery.rows[0];
-
-            const existingPaymentIntent = order?.payment_intent;
-
-            if (!existingPaymentIntent) {
-              return Promise.resolve();
-            }
-
-            await pool.query(
-              'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-              [
-                id,
-                isPaymentFailed
-                  ? PAYMENT_STATUS.FAILED
-                  : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
-              ]
-            );
-          })
-        );
-      } catch (error) {
-        return res
-          .status(500)
-          .json({
-            message:
-              "Event was catched successfully, but some DB error occurred",
-          });
-      }
+    if (!isPaymentFailed && !isPaymentSucceeded && !isPaymentCaptured) {
+      return;
     }
+
+    const paymentIntentMetadata = event.data.object.metadata;
+
+    if (paymentIntentMetadata.employeePaymentId) {
+      const employeePaymentId = paymentIntentMetadata.employeePaymentId;
+
+      await pool.query(
+        "UPDATE payments SET is_paid = $2, is_failed = $3 WHERE id = $1 RETURNING *",
+        [+employeePaymentId, isPaymentSucceeded, isPaymentFailed]
+      );
+    } else if (paymentIntentMetadata.orderIds) {
+      const orderIds =
+        paymentIntentMetadata.orderIds.split(",").map((orderId) => +orderId) ||
+        [];
+
+      await Promise.all(
+        orderIds.map(async (id) => {
+          const orderQuery = await client.query(
+            'SELECT * FROM "order" WHERE id = $1',
+            [id]
+          );
+          const order = orderQuery.rows[0];
+
+          const existingPaymentIntent = order?.payment_intent;
+
+          if (!existingPaymentIntent) {
+            return Promise.resolve();
+          }
+
+          await pool.query(
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+            [
+              id,
+              isPaymentFailed
+                ? PAYMENT_STATUS.FAILED
+                : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
+            ]
+          );
+        })
+      );
+    }
+
+    return res.status(200).json({ received: true });
   } catch (error) {
     return res.status(500).json({ error, received: true });
   }
