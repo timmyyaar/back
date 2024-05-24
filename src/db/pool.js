@@ -6,10 +6,6 @@ const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
 
 const pool = new Pool({
   connectionString: `${POSTGRES_URL}?sslmode=require`,
-  idleTimeoutMillis: 50000,
-  connectionTimeoutMillis: 50000,
-  createTimeoutMillis: 50000,
-  acquireTimeoutMillis: 50000,
 });
 
 pool.on("error", (err) => {
