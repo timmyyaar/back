@@ -12,7 +12,7 @@ const BlogsController = () => {
     try {
       const result = id
         ? await pool.query("SELECT * FROM blogs WHERE id = $1", [id])
-        : await pool.query("SELECT * FROM blogs");
+        : await pool.query("SELECT * FROM blogs ORDER BY id DESC");
 
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "No blogs found" });
