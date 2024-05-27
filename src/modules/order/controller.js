@@ -56,7 +56,7 @@ const OrderController = () => {
     reminders.forEach((row) => {
       const date = getDateTimeObjectFromString(row.date);
 
-      scheduleReminder(date, row);
+      scheduleReminder(date, row, transporter);
     });
   };
 
