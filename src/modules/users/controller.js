@@ -1,12 +1,14 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
+const env = require("../../helpers/environments");
+
+const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
+
 const constants = require("../../constants");
 const { getUpdatedUserRating } = require("../../utils");
 
 const pool = require("../../db/pool");
-
-const env = require("../../helpers/environments");
 
 const AUTH_COOKIE_EXPIRATION_TIME = 7 * 24 * 60 * 60 * 1000;
 
@@ -135,6 +137,9 @@ const UsersController = () => {
         email: user.email,
         rating: user.rating,
         role: user.role,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        customerId: user.customer_id,
       });
     } catch (error) {
       res.status(500).json({ error });
@@ -159,6 +164,10 @@ const UsersController = () => {
         lastName = "",
       } = req.body;
 
+      if (!email || !password || !role || !firstName || !lastName) {
+        return res.status(422).json({ message: "Some fields are empty" });
+      }
+
       const hashedPassword = await bcrypt.hash(password, 10);
 
       const userQuery = await pool.query(
@@ -177,9 +186,14 @@ const UsersController = () => {
         return res.status(422).json({ message: "Invalid email!" });
       }
 
+      const customer = await stripe.customers.create({
+        name: `${firstName} ${lastName}`,
+        email,
+      });
+
       const result = await pool.query(
         `INSERT INTO users(email, password, role, have_vacuum_cleaner,
-         have_car, first_name, last_name) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+         have_car, first_name, last_name, customer_id) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
         [
           email,
           hashedPassword,
@@ -188,6 +202,7 @@ const UsersController = () => {
           haveCar,
           firstName,
           lastName,
+          customer.id,
         ]
       );
 

@@ -42,9 +42,12 @@ const getDateTimeObjectFromString = (string) => {
   return new Date(providedDateString);
 };
 
+const getFloatOneDigit = (number) => Number(number.toFixed(1));
+
 module.exports = {
   getUpdatedUserRating,
   capitalizeFirstLetter,
   getDateTimeString,
   getDateTimeObjectFromString,
+  getFloatOneDigit,
 };
