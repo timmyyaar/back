@@ -26,6 +26,11 @@ employeePaymentsRouter
     "/employee-payments/:id/finish",
     verifyToken,
     employeePaymentsController.finishPayment
+  )
+  .patch(
+    "/employee-payments/:id/update-amount",
+    verifyToken,
+    employeePaymentsController.updatePaymentAmount
   );
 
 module.exports = employeePaymentsRouter;

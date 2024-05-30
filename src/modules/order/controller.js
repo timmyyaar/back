@@ -529,7 +529,7 @@ const OrderController = () => {
       const { checkList } = req.body;
 
       const existingOrderQuery = await pool.query(
-        'SELECT * FROM "order" WHERE (id = $1)',
+        'SELECT * FROM "order" WHERE id = $1',
         [id]
       );
       const existingOrder = existingOrderQuery.rows[0];
@@ -902,37 +902,6 @@ const OrderController = () => {
     }
   };
 
-  const updateOrderInvoiceStatus = async (req, res) => {
-    try {
-      const id = req.params.id;
-      const { isPaid } = req.body;
-
-      const {
-        rows: [{ exists }],
-      } = await pool.query(
-        'SELECT EXISTS(SELECT 1 FROM "order" WHERE id = $1)',
-        [id]
-      );
-
-      if (!exists) {
-        return res
-          .status(404)
-          .json({ message: `Order with ${id} id doesn't exist` });
-      }
-
-      const {
-        rows: [updatedOrder],
-      } = await pool.query(
-        `UPDATE "order" SET is_invoice_paid = $2 WHERE id = $1 RETURNING *`,
-        [id, isPaid]
-      );
-
-      return res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
-    } catch (error) {
-      return res.status(500).json({ error });
-    }
-  };
-
   const connectPaymentIntent = async (req, res) => {
     try {
       const { id } = req.params;
@@ -1091,7 +1060,7 @@ const OrderController = () => {
 
     const {
       rows: [existingOrder],
-    } = await pool.query('SELECT * FROM "order" WHERE (id = $1)', [id]);
+    } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
 
     if (!existingOrder) {
       return res.status(404).json({ message: "Order not found" });
@@ -1145,6 +1114,66 @@ const OrderController = () => {
     }
   };
 
+  const markOrderAsPaid = async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { role } = req;
+
+      if (role !== ROLES.ADMIN) {
+        return res
+          .status(403)
+          .json({ message: "You don't have access to this" });
+      }
+
+      const {
+        rows: [existingOrder],
+      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const {
+        rows: [connectedOrder],
+      } = await pool.query(
+        `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
+           and address = $4 and name = $5 and creation_date = $6)`,
+        [
+          id,
+          existingOrder.date,
+          existingOrder.number,
+          existingOrder.address,
+          existingOrder.name,
+          existingOrder.creation_date,
+        ]
+      );
+
+      const {
+        rows: [updatedOrder],
+      } = await pool.query(
+        `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
+        [id, PAYMENT_STATUS.CONFIRMED]
+      );
+
+      const updatedOrdersResult = [updatedOrder];
+
+      if (connectedOrder) {
+        const {
+          rows: [approvedConnectedOrder],
+        } = await pool.query(
+          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
+          [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
+        );
+
+        updatedOrdersResult.push(approvedConnectedOrder);
+      }
+
+      return res.status(200).json(getOrdersWithCleaners(updatedOrdersResult));
+    } catch (error) {
+      return res.status(500).json({ error });
+    }
+  };
+
   return {
     getOrder,
     getClientOrder,
@@ -1157,10 +1186,10 @@ const OrderController = () => {
     sendFeedback,
     refuseOrder,
     updateOrderExtraExpenses,
-    updateOrderInvoiceStatus,
     connectPaymentIntent,
     syncOrderPaymentIntent,
     approvePayment,
+    markOrderAsPaid,
   };
 };
 
