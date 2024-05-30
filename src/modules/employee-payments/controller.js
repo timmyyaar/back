@@ -201,11 +201,51 @@ const EmployeePaymentsController = () => {
     }
   };
 
+  const updatePaymentAmount = async (req, res) => {
+    const { id } = req.params;
+    const { amount } = req.body;
+    const { role } = req;
+
+    if (role !== constants.ROLES.ADMIN) {
+      return res.status(403).json({ message: "You don't have access to this" });
+    }
+
+    try {
+      const {
+        rows: [existingPayment],
+      } = await pool.query("SELECT * FROM payments WHERE id = $1", [id]);
+
+      if (!existingPayment) {
+        return res
+          .status(404)
+          .json({ message: "Employee payment doesn't exist" });
+      }
+
+      if (existingPayment.is_paid) {
+        return res.status(422).json({
+          message: "You can't change payment amount of completed payment",
+        });
+      }
+
+      const {
+        rows: [updatedPayment],
+      } = await pool.query(
+        "UPDATE payments SET amount = $2 WHERE id = $1 RETURNING *",
+        [id, amount]
+      );
+
+      return res.status(200).json(updatedPayment);
+    } catch (error) {
+      return res.status(500).json({ error });
+    }
+  };
+
   return {
     getMyPayments,
     getAllPayments,
     createLastWeekPayment,
     finishPayment,
+    updatePaymentAmount,
   };
 };
 
