@@ -8,6 +8,7 @@ const usersRouter = new Router();
 usersRouter
   .post("/sign-up", usersController.signUp)
   .post("/login", usersController.login)
+  .post("/logout", usersController.logOut)
   .get("/users", verifyToken, usersController.getUsers)
   .get("/users/my-user", verifyToken, usersController.getMyUser)
   .post("/users", verifyToken, usersController.createUser)
