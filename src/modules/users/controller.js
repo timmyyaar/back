@@ -109,6 +109,12 @@ const UsersController = () => {
     }
   };
 
+  const logOut = (req, res) => {
+    res.clearCookie("authToken", { httpOnly: true, secure: true });
+
+    return res.status(200).json("Logged out");
+  };
+
   const getUsers = async (req, res) => {
     if (req.role !== constants.ROLES.ADMIN) {
       return res
@@ -317,6 +323,7 @@ const UsersController = () => {
   return {
     signUp,
     login,
+    logOut,
     getUsers,
     getMyUser,
     createUser,
