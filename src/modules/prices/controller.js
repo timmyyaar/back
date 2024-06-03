@@ -5,9 +5,9 @@ const constants = require("../../constants");
 const PricesController = () => {
   const getPrices = async (req, res) => {
     try {
-      const result = await pool.query("SELECT * FROM prices");
+      const { rows } = await pool.query("SELECT * FROM prices");
 
-      return res.json(result.rows);
+      return res.json(rows);
     } catch (error) {
       return res.status(500).json({ error });
     }
