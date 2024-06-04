@@ -1,4 +1,5 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
+
 const env = require("../../helpers/environments");
 
 const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
@@ -37,10 +38,8 @@ const EmployeePaymentsController = () => {
     const { userId } = req;
 
     try {
-      const result = await pool.query(
-        "SELECT * FROM payments WHERE employee_id = $1 ORDER BY id DESC",
-        [userId]
-      );
+      const result =
+        await sql`SELECT * FROM payments WHERE employee_id = ${userId} ORDER BY id DESC`;
 
       return res.status(200).json(result.rows);
     } catch (error) {
@@ -56,9 +55,7 @@ const EmployeePaymentsController = () => {
     }
 
     try {
-      const result = await pool.query(
-        "SELECT * FROM payments ORDER BY id DESC"
-      );
+      const result = await sql`SELECT * FROM payments ORDER BY id DESC`;
 
       return res.status(200).json(result.rows);
     } catch (error) {
@@ -77,19 +74,17 @@ const EmployeePaymentsController = () => {
 
       const {
         rows: [{ exists }],
-      } = await pool.query(
-        "SELECT EXISTS(SELECT 1 FROM payments WHERE employee_id = $1 AND period_start = $2 AND period_end = $3)",
-        [userId, prevTuesdayString, lastTuesdayString]
-      );
+      } =
+        await sql`SELECT EXISTS(SELECT 1 FROM payments WHERE employee_id = ${userId}
+          AND period_start = ${prevTuesdayString} AND period_end = ${lastTuesdayString})`;
 
       if (exists) {
         return res
           .status(409)
           .json({ message: "Payment period already exists" });
       } else {
-        const { rows: orders } = await pool.query(
-          'SELECT * FROM "order" ORDER BY id DESC'
-        );
+        const { rows: orders } =
+          await sql`SELECT * FROM "order" ORDER BY id DESC`;
 
         const ordersForLastPeriod = orders.filter(
           ({ date, cleaner_id }) =>
@@ -123,20 +118,13 @@ const EmployeePaymentsController = () => {
             message: "Some of orders in this period is not finished",
           });
         } else {
+          const fullName = `${firstName} ${lastName}`;
           const {
             rows: [createdPaymentPeriod],
-          } = await pool.query(
-            `INSERT INTO payments (employee_id, period_start, period_end, order_ids, amount, employee_name)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [
-              userId,
-              prevTuesdayString,
-              lastTuesdayString,
-              orderIdsForLastPeriod,
-              amountToPay,
-              `${firstName} ${lastName}`,
-            ]
-          );
+          } =
+            await sql`INSERT INTO payments (employee_id, period_start, period_end, order_ids,
+             amount, employee_name) VALUES (${userId}, ${prevTuesdayString}, ${lastTuesdayString},
+              ${orderIdsForLastPeriod}, ${amountToPay}, ${fullName}) RETURNING *`;
 
           if (amountToPay > 0) {
             const intent = await stripe.paymentIntents.create({
@@ -152,10 +140,8 @@ const EmployeePaymentsController = () => {
 
             const {
               rows: [updatedPaymentPeriod],
-            } = await pool.query(
-              `UPDATE payments SET payment_intent = $2, client_secret = $3 WHERE id = $1 RETURNING *`,
-              [createdPaymentPeriod.id, intent.id, intent.client_secret]
-            );
+            } = await sql`UPDATE payments SET payment_intent = ${intent.id},
+              client_secret = ${intent.client_secret} WHERE id = ${createdPaymentPeriod.id} RETURNING *`;
 
             return res.status(200).json(updatedPaymentPeriod);
           } else {
@@ -174,7 +160,7 @@ const EmployeePaymentsController = () => {
     try {
       const {
         rows: [existingPayment],
-      } = await pool.query("SELECT * FROM payments WHERE id = $1", [id]);
+      } = await sql`SELECT * FROM payments WHERE id = ${id}`;
 
       if (!existingPayment) {
         return res
@@ -190,10 +176,8 @@ const EmployeePaymentsController = () => {
 
       const {
         rows: [updatedPayment],
-      } = await pool.query(
-        "UPDATE payments SET is_paid = $2 WHERE id = $1 RETURNING *",
-        [id, true]
-      );
+      } =
+        await sql`UPDATE payments SET is_paid = ${true} WHERE id = ${id} RETURNING *`;
 
       return res.status(200).json(updatedPayment);
     } catch (error) {
@@ -213,7 +197,7 @@ const EmployeePaymentsController = () => {
     try {
       const {
         rows: [existingPayment],
-      } = await pool.query("SELECT * FROM payments WHERE id = $1", [id]);
+      } = await sql`SELECT * FROM payments WHERE id = ${id}`;
 
       if (!existingPayment) {
         return res
@@ -229,10 +213,8 @@ const EmployeePaymentsController = () => {
 
       const {
         rows: [updatedPayment],
-      } = await pool.query(
-        "UPDATE payments SET amount = $2 WHERE id = $1 RETURNING *",
-        [id, amount]
-      );
+      } =
+        await sql`UPDATE payments SET amount = ${amount} WHERE id = ${id} RETURNING *`;
 
       return res.status(200).json(updatedPayment);
     } catch (error) {

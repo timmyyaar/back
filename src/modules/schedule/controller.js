@@ -1,4 +1,4 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const { ROLES } = require("../../constants");
 
@@ -29,10 +29,8 @@ const ScheduleController = () => {
 
       const clients =
         isAdmin && !req.params.id
-          ? await pool.query("SELECT * FROM schedule")
-          : await pool.query("SELECT * FROM schedule WHERE employee_id = $1", [
-              id,
-            ]);
+          ? await sql`SELECT * FROM schedule`
+          : await sql`SELECT * FROM schedule WHERE employee_id = ${id}`;
 
       res
         .status(200)
@@ -58,24 +56,13 @@ const ScheduleController = () => {
     } = req.body;
 
     try {
-      const createdScheduleQuery = await pool.query(
-        `INSERT INTO schedule (employee_id, date, first_period, second_period,
-             third_period, fourth_period, first_period_additional,
-             second_period_additional, third_period_additional, fourth_period_additional)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-        [
-          employeeId,
-          date,
-          firstPeriod,
-          secondPeriod,
-          thirdPeriod,
-          fourthPeriod,
-          firstPeriodAdditional,
-          secondPeriodAdditional,
-          thirdPeriodAdditional,
-          fourthPeriodAdditional,
-        ]
-      );
+      const createdScheduleQuery =
+        await sql`INSERT INTO schedule (employee_id, date, first_period, second_period,
+          third_period, fourth_period, first_period_additional,
+          second_period_additional, third_period_additional, fourth_period_additional)
+          VALUES (${employeeId}, ${date}, ${firstPeriod}, ${secondPeriod}, ${thirdPeriod},
+          ${fourthPeriod}, ${firstPeriodAdditional}, ${secondPeriodAdditional},
+          ${thirdPeriodAdditional}, ${fourthPeriodAdditional}) RETURNING *`;
 
       res
         .status(200)
@@ -101,24 +88,14 @@ const ScheduleController = () => {
     } = req.body;
 
     try {
-      const updatedScheduleQuery = await pool.query(
-        `UPDATE schedule SET date = $2, first_period = $3,
-             second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-             second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10
-             WHERE id = $1 RETURNING *`,
-        [
-          id,
-          date,
-          firstPeriod,
-          secondPeriod,
-          thirdPeriod,
-          fourthPeriod,
-          firstPeriodAdditional,
-          secondPeriodAdditional,
-          thirdPeriodAdditional,
-          fourthPeriodAdditional,
-        ]
-      );
+      const updatedScheduleQuery =
+        await sql`UPDATE schedule SET date = ${date}, first_period = ${firstPeriod},
+          second_period = ${secondPeriod}, third_period = ${thirdPeriod},
+          fourth_period = ${fourthPeriod}, first_period_additional = ${firstPeriodAdditional},
+          second_period_additional = ${secondPeriodAdditional},
+          third_period_additional = ${thirdPeriodAdditional},
+          fourth_period_additional = ${fourthPeriodAdditional}
+          WHERE id = ${id} RETURNING *`;
 
       res
         .status(200)

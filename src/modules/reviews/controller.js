@@ -1,11 +1,11 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const constants = require("../../constants");
 
 const ReviewsController = () => {
   const getReviews = async (req, res) => {
     try {
-      const result = await pool.query("SELECT * FROM reviews ORDER BY id ASC");
+      const result = await sql`SELECT * FROM reviews ORDER BY id ASC`;
 
       return res.json(result.rows);
     } catch (error) {
@@ -22,10 +22,10 @@ const ReviewsController = () => {
           res.status(422).json({ message: "Invalid email" });
         }
 
-        const result = await pool.query(
-          "INSERT INTO reviews(rating, name, email, text, visible) VALUES($1, $2, $3, $4, $5) RETURNING *",
-          [rating, name, email, text, visible ? "1" : "0"]
-        );
+        const isVisible = visible ? "1" : "0";
+        const result =
+          await sql`INSERT INTO reviews(rating, name, email, text, visible)
+            VALUES(${rating}, ${name}, ${email}, ${text}, ${isVisible}) RETURNING *`;
 
         res.status(200).json(result.rows[0]);
       } else {
@@ -48,18 +48,16 @@ const ReviewsController = () => {
           res.status(422).json({ message: "Invalid email" });
         }
 
-        const reviewExists = await pool.query(
-          "SELECT * FROM reviews WHERE id = $1",
-          [id]
-        );
+        const reviewExists = await sql`SELECT * FROM reviews WHERE id = ${id}`;
 
         if (reviewExists.rowCount === 0) {
           res.status(404).json({ message: "Review not found" });
         } else {
-          const result = await pool.query(
-            "UPDATE reviews SET rating = $2, name = $3, email = $4, text = $5, visible = $6 WHERE id = $1 RETURNING *",
-            [id, rating, name, email, text, visible ? "1" : "0"]
-          );
+          const isVisible = visible ? "1" : "0";
+
+          const result =
+            await sql`UPDATE reviews SET rating = ${rating}, name = ${name},
+              email = ${email}, text = ${text}, visible = ${isVisible} WHERE id = ${id} RETURNING *`;
 
           res.status(200).json(result.rows[0]);
         }
@@ -77,10 +75,7 @@ const ReviewsController = () => {
     try {
       const id = req.params.id;
 
-      const result = await pool.query(
-        "DELETE FROM reviews WHERE id = $1 RETURNING *",
-        [id]
-      );
+      const result = await sql`DELETE FROM reviews WHERE id = ${id} RETURNING *`
 
       res
         .status(200)
