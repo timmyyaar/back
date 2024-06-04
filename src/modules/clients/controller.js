@@ -1,9 +1,9 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const ClientsController = () => {
   const getClients = async (req, res) => {
     try {
-      const clients = await pool.query("SELECT * FROM clients");
+      const clients = await sql`SELECT * FROM clients`;
 
       res.status(200).json(clients.rows);
     } catch (error) {
@@ -23,19 +23,10 @@ const ClientsController = () => {
     } = req.body;
 
     try {
-      const createdClient = await pool.query(
-        `INSERT INTO clients (name, phone, email, address, first_order_creation_date, first_order_date, instagram)
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [
-          name,
-          phone,
-          email,
-          address,
-          firstOrderCreationDate,
-          firstOrderDate,
-          instagram,
-        ]
-      );
+      const createdClient =
+        await sql`INSERT INTO clients (name, phone, email, address, first_order_creation_date,
+          first_order_date, instagram) VALUES (${name}, ${phone}, ${email}, ${address},
+          ${firstOrderCreationDate}, ${firstOrderDate}, ${instagram}) RETURNING *`;
 
       res.status(200).json(createdClient.rows[0]);
     } catch (error) {
@@ -56,21 +47,11 @@ const ClientsController = () => {
     } = req.body;
 
     try {
-      const updatedClient = await pool.query(
-        `UPDATE clients SET name = $2, phone = $3,
-         email = $4, address = $5, instagram = $6, first_order_creation_date = $7, first_order_date = $8
-         WHERE id = $1 RETURNING *`,
-        [
-          id,
-          name,
-          phone,
-          email,
-          address,
-          instagram,
-          firstOrderCreationDate,
-          firstOrderDate,
-        ]
-      );
+      const updatedClient =
+        await sql`UPDATE clients SET name = ${name}, phone = ${phone}, email = ${email},
+          address = ${address}, instagram = ${instagram}, 
+          first_order_creation_date = ${firstOrderCreationDate}, first_order_date = ${firstOrderDate}
+          WHERE id = ${id} RETURNING *`;
 
       res.status(200).json(updatedClient.rows[0]);
     } catch (error) {
@@ -82,7 +63,7 @@ const ClientsController = () => {
     const { id } = req.params;
 
     try {
-      await pool.query("DELETE FROM clients WHERE id = $1", [id]);
+      await sql`DELETE FROM clients WHERE id = ${id}`;
 
       res.json({ message: "Client deleted" });
     } catch (error) {

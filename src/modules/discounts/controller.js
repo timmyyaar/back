@@ -1,11 +1,9 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const DiscountsController = () => {
   const getDiscounts = async (req, res) => {
     try {
-      const result = await pool.query(
-        "SELECT * FROM discounts ORDER BY id ASC"
-      );
+      const result = await sql`SELECT * FROM discounts ORDER BY id ASC`;
 
       res.json(result.rows);
     } catch (error) {
@@ -18,10 +16,8 @@ const DiscountsController = () => {
       const { date, value } = req.body;
 
       if (date && value) {
-        const existingDiscount = await pool.query(
-          "SELECT * FROM discounts WHERE date = $1",
-          [date]
-        );
+        const existingDiscount =
+          await sql`SELECT * FROM discounts WHERE date = ${date}`;
 
         if (existingDiscount.rows[0]) {
           return res
@@ -29,10 +25,8 @@ const DiscountsController = () => {
             .json({ message: "Discount for this date already exists!" });
         }
 
-        const result = await pool.query(
-          "INSERT INTO discounts(date, value) VALUES($1, $2) RETURNING *",
-          [date, value]
-        );
+        const result =
+          await sql`INSERT INTO discounts(date, value) VALUES(${date}, ${value}) RETURNING *`;
 
         res.status(200).json(result.rows[0]);
       } else {
@@ -51,29 +45,26 @@ const DiscountsController = () => {
       const id = req.params.id;
 
       if (date && value) {
-        const existingDiscount = await pool.query(
-          "SELECT * FROM discounts WHERE id = $1",
-          [id]
-        );
-        const existingDiscountWithDate = await pool.query(
-          "SELECT * FROM discounts WHERE id != $1 AND date = $2",
-          [id, date]
-        );
+        const {
+          rows: [{ exists: existingDiscount }],
+        } = await sql`SELECT EXISTS(SELECT * FROM discounts WHERE id = ${id})`;
+        const {
+          rows: [{ exists: existingDiscountWithDate }],
+        } =
+          await sql`SELECT EXISTS(SELECT * FROM discounts WHERE id != ${id} AND date = ${date})`;
 
-        if (existingDiscount.rowCount === 0) {
+        if (!existingDiscount) {
           return res.status(404).json({ message: "Discount not found" });
         }
 
-        if (existingDiscountWithDate.rows[0]) {
+        if (existingDiscountWithDate) {
           return res
             .status(409)
             .json({ message: "Discount for this date already exists!" });
         }
 
-        const result = await pool.query(
-          "UPDATE discounts SET date = $2, value = $3 WHERE id = $1 RETURNING *",
-          [id, date, value]
-        );
+        const result =
+          await sql`UPDATE discounts SET date = ${date}, value = ${value} WHERE id = ${id} RETURNING *`;
 
         res.status(200).json(result.rows[0]);
       } else {
@@ -82,6 +73,7 @@ const DiscountsController = () => {
           .json({ message: "One of the required fields is missing" });
       }
     } catch (error) {
+      console.log(error);
       res.status(500).json({ error });
     }
   };
@@ -90,10 +82,8 @@ const DiscountsController = () => {
     try {
       const id = req.params.id;
 
-      const result = await pool.query(
-        "DELETE FROM discounts WHERE id = $1 RETURNING *",
-        [id]
-      );
+      const result =
+        await sql`DELETE FROM discounts WHERE id = ${id} RETURNING *`;
 
       res
         .status(200)

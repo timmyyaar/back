@@ -1,11 +1,11 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const constants = require("../../constants");
 
 const PricesController = () => {
   const getPrices = async (req, res) => {
     try {
-      const { rows } = await pool.query("SELECT * FROM prices");
+      const { rows } = await sql`SELECT * FROM prices`;
 
       return res.json(rows);
     } catch (error) {
@@ -36,10 +36,7 @@ const PricesController = () => {
       await Promise.all(
         prices.map(
           async ({ key, price }) =>
-            await pool.query("UPDATE prices SET price = $2 WHERE key = $1", [
-              key,
-              price,
-            ])
+            await sql`UPDATE prices SET price = ${price} WHERE key = ${key}`
         )
       );
 

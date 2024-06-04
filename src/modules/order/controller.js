@@ -1,4 +1,4 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const nodemailer = require("nodemailer");
 
@@ -50,7 +50,7 @@ const { CREATED_ORDERS_CHANNEL_ID, ORDER_STATUS } = require("./constants");
 
 const OrderController = () => {
   const reScheduleReminders = async () => {
-    const remindersQuery = await pool.query("SELECT * FROM reminders");
+    const remindersQuery = await sql`SELECT * FROM reminders`;
     const reminders = remindersQuery.rows;
 
     reminders.forEach((row) => {
@@ -64,7 +64,7 @@ const OrderController = () => {
 
   const getOrder = async (req, res) => {
     try {
-      const result = await pool.query('SELECT * FROM "order" ORDER BY id DESC');
+      const result = await sql`SELECT * FROM "order" ORDER BY id DESC`;
 
       return res.json(getOrdersWithCleaners(result.rows));
     } catch (error) {
@@ -78,10 +78,8 @@ const OrderController = () => {
     const idsArray = ids.split(",").map((item) => +item);
 
     try {
-      const result = await pool.query(
-        'SELECT * FROM "order" WHERE id = ANY($1::int[])',
-        [idsArray]
-      );
+      const result =
+        await sql`SELECT * FROM "order" WHERE id = ANY(${idsArray}::int[])`;
 
       return res.json(getOrdersWithCleaners(result.rows));
     } catch (error) {
@@ -130,19 +128,16 @@ const OrderController = () => {
 
       if (name && number && email && address && date && city) {
         if (promo) {
-          const isPromoUsed = await pool.query(
-            'SELECT * FROM "order" WHERE (promo = $1) AND (address = $2 OR number = $3)',
-            [promo, address, number]
-          );
+          const isPromoUsed =
+            await sql`SELECT * FROM "order" WHERE (promo = ${promo})
+            AND (address = ${address} OR number = ${number})`;
 
           if (isPromoUsed.rows[0]) {
             return res.status(409).send({ message: "Promo already used!" });
           }
 
-          const existingPromoQuery = await pool.query(
-            "SELECT * FROM promo WHERE code = $1",
-            [promo]
-          );
+          const existingPromoQuery =
+            await sql`SELECT * FROM promo WHERE code = ${promo}`;
           const existingPromo = existingPromoQuery.rows[0];
 
           if (
@@ -151,94 +146,67 @@ const OrderController = () => {
           ) {
             return res.status(410).send("This promo is expired!");
           } else {
-            await pool.query("UPDATE promo SET count_used = $1 WHERE id = $2", [
-              existingPromo.count_used + 1,
-              existingPromo.id,
-            ]);
+            await sql`UPDATE promo SET count_used = ${
+              existingPromo.count_used + 1
+            } WHERE id = ${existingPromo.id}`;
           }
         }
 
-        const isClientExists = await pool.query(
-          "SELECT * FROM clients WHERE (phone = $1 AND name = $2)",
-          [number, name]
-        );
+        const isClientExists =
+          await sql`SELECT * FROM clients WHERE (phone = ${number} AND name = ${name})`;
         const isNewClient = isClientExists.rowCount === 0;
 
         if (isNewClient) {
-          await pool.query(
-            `INSERT INTO clients (name, phone, email, address, first_order_creation_date, first_order_date)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [name, number, email, address, creationDate, date]
-          );
+          await sql`INSERT INTO clients (name, phone, email, address, first_order_creation_date, first_order_date)
+             VALUES (${name}, ${number}, ${email}, ${address}, ${creationDate}, ${date}) RETURNING *`;
         }
 
+        const paymentStatus = onlinePayment ? PAYMENT_STATUS.PENDING : null;
+        const firstOrderCleanerReward = getCleanerReward({
+          title,
+          price_original: mainServicePriceOriginal,
+          cleaners_count: mainServiceCleanersCount,
+          estimate: mainServiceEstimate,
+          price: mainServicePrice,
+        });
+
         if (secTitle) {
-          const result = await pool.query(
-            `INSERT INTO "order" 
+          const secondOrderCleanerReward = getCleanerReward({
+            title: secTitle,
+            price_original: secondServicePriceOriginal,
+            cleaners_count: secondServiceCleanersCount,
+            estimate: secondServiceEstimate,
+            price: secondServicePrice,
+          });
+
+          const result = await sql`INSERT INTO "order" 
               (name, number, email, address, date, onlinePayment, 
               requestPreviousCleaner, personalData, promo, 
               estimate, title, counter, subService, price, total_service_price, 
               price_original, total_service_price_original, additional_information, 
               is_new_client, city, transportation_price, cleaners_count, language, 
-              creation_date, own_check_list, reward_original, payment_status, payment_intent,
+              creation_date, own_check_list, reward_original, payment_status, payment_intent, 
               manual_cleaners_count, status) 
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36, $37, $39), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36, $38, $39) RETURNING *`,
-            [
-              name,
-              number,
-              email,
-              address,
-              date,
-              onlinePayment,
-              requestPreviousCleaner,
-              personalData,
-              promo,
-              mainServiceEstimate,
-              title,
-              counter,
-              subService,
-              mainServicePrice,
-              secTitle,
-              secCounter,
-              secSubService,
-              secondServicePrice,
-              price,
-              mainServicePriceOriginal,
-              secondServicePriceOriginal,
-              priceOriginal,
-              additionalInformation,
-              isNewClient,
-              city,
-              transportationPrice,
-              mainServiceCleanersCount,
-              secondServiceEstimate,
-              secondServiceCleanersCount,
-              language,
-              creationDate,
-              ownCheckList,
-              getCleanerReward({
-                title,
-                price_original: mainServicePriceOriginal,
-                cleaners_count: mainServiceCleanersCount,
-                estimate: mainServiceEstimate,
-                price: mainServicePrice,
-              }),
-              getCleanerReward({
-                title: secTitle,
-                price_original: secondServicePriceOriginal,
-                cleaners_count: secondServiceCleanersCount,
-                estimate: secondServiceEstimate,
-                price: secondServicePrice,
-              }),
-              onlinePayment ? PAYMENT_STATUS.PENDING : null,
-              paymentIntentId,
-              mainServiceManualCleanersCount,
-              secondServiceManualCleanersCount,
-              ORDER_STATUS.CREATED,
-            ]
-          );
+              VALUES (
+                ${name}, ${number}, ${email}, ${address}, ${date}, ${onlinePayment},
+                ${requestPreviousCleaner}, ${personalData}, ${promo}, ${mainServiceEstimate},
+                ${title}, ${counter}, ${subService}, ${mainServicePrice}, ${price},
+                ${mainServicePriceOriginal}, ${priceOriginal}, ${additionalInformation},
+                ${isNewClient}, ${city}, ${transportationPrice}, ${mainServiceCleanersCount},
+                ${language}, ${creationDate}, ${ownCheckList}, ${firstOrderCleanerReward},
+                ${paymentStatus}, ${paymentIntentId}, ${mainServiceManualCleanersCount},
+                ${ORDER_STATUS.CREATED}
+              ),
+              (
+                ${name}, ${number}, ${email}, ${address}, ${date}, ${onlinePayment},
+                ${requestPreviousCleaner}, ${personalData}, ${promo}, ${secondServiceEstimate},
+                ${secTitle}, ${secCounter}, ${secSubService}, ${secondServicePrice}, ${price},
+                ${secondServicePriceOriginal}, ${priceOriginal}, ${additionalInformation},
+                ${isNewClient}, ${city}, ${transportationPrice}, ${secondServiceCleanersCount},
+                ${language}, ${creationDate}, ${ownCheckList}, ${secondOrderCleanerReward},
+                ${paymentStatus}, ${paymentIntentId}, ${secondServiceManualCleanersCount},
+                ${ORDER_STATUS.CREATED}
+              ) RETURNING *`;
 
           if (env.getEnvironment("MODE") === "prod") {
             await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
@@ -253,56 +221,24 @@ const OrderController = () => {
             .status(200)
             .json(result.rows.map((order) => ({ ...order, cleaner_id: [] })));
         } else {
-          const result = await pool.query(
-            `INSERT INTO "order" 
-             (name, number, email, address, date, onlinePayment, 
-             requestPreviousCleaner, personalData, price, promo, 
-             estimate, title, counter, subService, total_service_price, 
-             price_original, total_service_price_original, additional_information, 
-             is_new_client, city, transportation_price, cleaners_count, language, 
-             creation_date, own_check_list, reward_original, payment_status, payment_intent,
-             manual_cleaners_count, status) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30) RETURNING *`,
-            [
-              name,
-              number,
-              email,
-              address,
-              date,
-              onlinePayment,
-              requestPreviousCleaner,
-              personalData,
-              mainServicePrice,
-              promo,
-              mainServiceEstimate,
-              title,
-              counter,
-              subService,
-              price,
-              mainServicePriceOriginal,
-              priceOriginal,
-              additionalInformation,
-              isNewClient,
-              city,
-              transportationPrice,
-              mainServiceCleanersCount,
-              language,
-              creationDate,
-              ownCheckList,
-              getCleanerReward({
-                title,
-                price_original: mainServicePriceOriginal,
-                cleaners_count: mainServiceCleanersCount,
-                estimate: mainServiceEstimate,
-                price: mainServicePrice,
-              }),
-              onlinePayment ? PAYMENT_STATUS.PENDING : null,
-              paymentIntentId,
-              mainServiceManualCleanersCount,
-              ORDER_STATUS.CREATED,
-            ]
-          );
+          const result = await sql`INSERT INTO "order" 
+              (name, number, email, address, date, onlinePayment, 
+              requestPreviousCleaner, personalData, promo, 
+              estimate, title, counter, subService, price, total_service_price, 
+              price_original, total_service_price_original, additional_information, 
+              is_new_client, city, transportation_price, cleaners_count, language, 
+              creation_date, own_check_list, reward_original, payment_status, payment_intent, 
+              manual_cleaners_count, status) 
+              VALUES (
+                ${name}, ${number}, ${email}, ${address}, ${date}, ${onlinePayment},
+                ${requestPreviousCleaner}, ${personalData}, ${promo}, ${mainServiceEstimate},
+                ${title}, ${counter}, ${subService}, ${mainServicePrice}, ${price},
+                ${mainServicePriceOriginal}, ${priceOriginal}, ${additionalInformation},
+                ${isNewClient}, ${city}, ${transportationPrice}, ${mainServiceCleanersCount},
+                ${language}, ${creationDate}, ${ownCheckList}, ${firstOrderCleanerReward},
+                ${paymentStatus}, ${paymentIntentId}, ${mainServiceManualCleanersCount},
+                ${ORDER_STATUS.CREATED}
+             ) RETURNING *`;
 
           if (env.getEnvironment("MODE") === "prod") {
             await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
@@ -327,10 +263,8 @@ const OrderController = () => {
     try {
       const { id } = req.params;
 
-      const existingOrderQuery = await pool.query(
-        'SELECT * FROM "order" WHERE id = $1',
-        [id]
-      );
+      const existingOrderQuery =
+        await sql`SELECT * FROM "order" WHERE id = ${id}`;
       const existingOrder = existingOrderQuery.rows[0];
 
       if (!existingOrder) {
@@ -346,25 +280,15 @@ const OrderController = () => {
 
       const {
         rows: [connectedOrder],
-      } = await pool.query(
-        `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
-           and address = $4 and name = $5 and creation_date = $6)`,
-        [
-          id,
-          existingOrder.date,
-          existingOrder.number,
-          existingOrder.address,
-          existingOrder.name,
-          existingOrder.creation_date,
-        ]
-      );
+      } =
+        await sql`SELECT * FROM "order" WHERE (id != ${id}) AND (date = ${existingOrder.date}
+          and number = ${existingOrder.number} and address = ${existingOrder.address}
+          and name = ${existingOrder.name} and creation_date = ${existingOrder.creation_date})`;
 
-      await pool.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
+      await sql`DELETE FROM "order" WHERE id = ${id} RETURNING *`;
 
       if (connectedOrder) {
-        await pool.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [
-          connectedOrder.id,
-        ]);
+        await sql`DELETE FROM "order" WHERE id = ${connectedOrder.id} RETURNING *`;
       }
 
       if (needToCancelPaymentIntent) {
@@ -384,10 +308,8 @@ const OrderController = () => {
       const id = req.params.id;
       const { cleanerId = [] } = req.body;
 
-      const existingOrderQuery = await pool.query(
-        'SELECT * FROM "order" WHERE id = $1',
-        [id]
-      );
+      const existingOrderQuery =
+        await sql`SELECT * FROM "order" WHERE id = ${id}`;
       const existingOrder = existingOrderQuery.rows[0];
 
       if (!existingOrder) {
@@ -407,24 +329,20 @@ const OrderController = () => {
         ? JSON.stringify(getOrderCheckList(existingOrder))
         : existingOrder.check_list;
 
-      const result = await pool.query(
-        `UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4,
-         is_confirmed = $5 WHERE id = $1 RETURNING *`,
-        [
-          id,
-          cleanerId.join(","),
-          isApprovedStatus ? "approved" : "created",
-          updatedCheckList,
-          isApprovedStatus ? true : existingOrder.is_confirmed,
-        ]
-      );
+      const cleanerIds = cleanerId.join(",");
+      const status = isApprovedStatus ? "approved" : "created";
+      const isConfirmed = isApprovedStatus ? true : existingOrder.is_confirmed;
+
+      const result = await sql`UPDATE "order" SET cleaner_id = ${cleanerIds},
+        status = ${status}, check_list = ${updatedCheckList}, is_confirmed = ${isConfirmed}
+        WHERE id = ${id} RETURNING *`;
 
       await updateScheduleForMultipleCleaners(existingOrder, cleanerId);
 
       const updatedOrder = result.rows[0];
 
       if (isApprovedStatus) {
-        const { rows: locales } = await pool.query("SELECT * FROM locales");
+        const { rows: locales } = await sql`SELECT * FROM locales`;
 
         await sendConfirmationEmailAndTelegramMessage(
           existingOrder,
@@ -452,7 +370,7 @@ const OrderController = () => {
 
       const {
         rows: [existingOrder],
-      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await sql`SELECT * FROM "order" WHERE id = ${id}`;
 
       if (!existingOrder) {
         return res.status(404).json({ message: "Order not found" });
@@ -462,16 +380,12 @@ const OrderController = () => {
         ? existingOrder.cleaner_id.split(",")
         : [];
 
-      const cleanersQuery = await pool.query(
-        "SELECT * FROM users WHERE id = ANY($1::int[])",
-        [existingCleanerId]
-      );
+      const cleanersQuery =
+        await sql`SELECT * FROM users WHERE id = ANY(${existingCleanerId}::int[])`;
       const assignedCleaners = cleanersQuery.rows;
 
-      const currentCleanerQuery = await pool.query(
-        "SELECT * FROM users WHERE id = $1",
-        [cleanerId]
-      );
+      const currentCleanerQuery =
+        await sql`SELECT * FROM users WHERE id = ${cleanerId}`;
       const currentCleaner = currentCleanerQuery.rows[0];
 
       if (
@@ -499,10 +413,9 @@ const OrderController = () => {
           .json({ message: "You already assigned to this order!" });
       }
 
-      const result = await pool.query(
-        'UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *',
-        [id, [...existingCleanerId, cleanerId].join(",")]
-      );
+      const cleanerIdsString = [...existingCleanerId, cleanerId].join(",");
+      const result =
+        await sql`UPDATE "order" SET cleaner_id = ${cleanerIdsString} WHERE id = ${id} RETURNING *`;
       const updatedOrder = result.rows[0];
 
       await addOrderToSchedule(existingOrder, cleanerId);
@@ -528,10 +441,8 @@ const OrderController = () => {
 
       const { checkList } = req.body;
 
-      const existingOrderQuery = await pool.query(
-        'SELECT * FROM "order" WHERE id = $1',
-        [id]
-      );
+      const existingOrderQuery =
+        await sql`SELECT * FROM "order" WHERE id = ${id}`;
       const existingOrder = existingOrderQuery.rows[0];
 
       if (!existingOrder) {
@@ -540,10 +451,9 @@ const OrderController = () => {
 
       const {
         rows: [connectedOrder],
-      } = await pool.query(
-        'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
-        [id, existingOrder.date, existingOrder.number, existingOrder.address]
-      );
+      } = await sql`SELECT * FROM "order" WHERE (id != ${id}) AND
+        (date = ${existingOrder.date} and number = ${existingOrder.number}
+        and address = ${existingOrder.address})`;
 
       const feedBackLinkId = connectedOrder
         ? [
@@ -580,22 +490,20 @@ const OrderController = () => {
         await stripe.paymentIntents.cancel(existingOrder.payment_intent);
       }
 
-      const result = await pool.query(
-        `UPDATE "order" SET status = $2, feedback_link_id = $3,
-         check_list = $4, is_confirmed = $5, payment_status = $6 WHERE id = $1 RETURNING *`,
-        [
-          id,
-          status,
-          status === ORDER_STATUS.IN_PROGRESS
-            ? base64Orders
-            : existingOrder.feedback_link_id,
-          updatedCheckList,
-          status === ORDER_STATUS.APPROVED ? true : existingOrder.is_confirmed,
-          needToCancelPayment
-            ? PAYMENT_STATUS.CANCELED
-            : existingOrder.payment_status,
-        ]
-      );
+      const feedbackLinkId =
+        status === ORDER_STATUS.IN_PROGRESS
+          ? base64Orders
+          : existingOrder.feedback_link_id;
+      const isConfirmed =
+        status === ORDER_STATUS.APPROVED ? true : existingOrder.is_confirmed;
+      const paymentStatus = needToCancelPayment
+        ? PAYMENT_STATUS.CANCELED
+        : existingOrder.payment_status;
+
+      const result =
+        await sql`UPDATE "order" SET status = ${status}, feedback_link_id = ${feedbackLinkId},
+          check_list = ${updatedCheckList}, is_confirmed = ${isConfirmed},
+          payment_status = ${paymentStatus} WHERE id = ${id} RETURNING *`;
 
       const getUpdatedConnectedOrder = async () => {
         const updatedConnectedOrderFeedbackLink =
@@ -612,15 +520,11 @@ const OrderController = () => {
 
         const {
           rows: [updatedConnectedOrder],
-        } = await pool.query(
-          'UPDATE "order" SET feedback_link_id = $2, status = $3, payment_status = $4 WHERE id = $1 RETURNING *',
-          [
-            connectedOrder.id,
-            updatedConnectedOrderFeedbackLink,
-            updatedConnectedOrderStatus,
-            updatedConnectedOrderPaymentStatus,
-          ]
-        );
+        } =
+          await sql`UPDATE "order" SET feedback_link_id = ${updatedConnectedOrderFeedbackLink},
+            status = ${updatedConnectedOrderStatus}, 
+            payment_status = ${updatedConnectedOrderPaymentStatus}
+            WHERE id = ${connectedOrder.id} RETURNING *`;
 
         return updatedConnectedOrder;
       };
@@ -628,7 +532,7 @@ const OrderController = () => {
       const updatedOrder = { ...result.rows[0] };
 
       if (status === ORDER_STATUS.APPROVED) {
-        const { rows: locales } = await pool.query("SELECT * FROM locales");
+        const { rows: locales } = await sql`SELECT * FROM locales`;
 
         await sendConfirmationEmailAndTelegramMessage(
           existingOrder,
@@ -688,22 +592,14 @@ const OrderController = () => {
 
       const {
         rows: [existingOrder],
-      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await sql`SELECT * FROM "order" WHERE id = ${id}`;
 
       const {
         rows: [connectedOrder],
-      } = await pool.query(
-        `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
-           and address = $4 and name = $5 and creation_date = $6)`,
-        [
-          id,
-          existingOrder.date,
-          existingOrder.number,
-          existingOrder.address,
-          existingOrder.name,
-          existingOrder.creation_date,
-        ]
-      );
+      } =
+        await sql`SELECT * FROM "order" WHERE (id != ${id}) AND (date = ${existingOrder.date}
+          and number = ${existingOrder.number} and address = ${existingOrder.address}
+          and name = ${existingOrder.name} and creation_date = ${existingOrder.creation_date})`;
 
       const wasOnlinePaymentChanged =
         onlinePayment !== existingOrder.onlinepayment;
@@ -727,62 +623,37 @@ const OrderController = () => {
         });
       }
 
+      const updatedPaymentIntent = wasOnlinePaymentChanged
+        ? null
+        : existingOrder.payment_intent;
+      const updatedPaymentStatus = wasOnlinePaymentChanged
+        ? null
+        : existingOrder.payment_status;
+      const updatedCheckList = ownCheckList || false;
+
       const {
         rows: [updatedOrder],
-      } = await pool.query(
-        `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
-               date = $6, onlinePayment = $7, price = $8, estimate = $9, title = $10,
-               counter = $11, subService = $12, total_service_price = $13,
-               total_service_price_original = $14, price_original = $15,
-               note = $16, reward = $17, own_check_list = $18, payment_intent = $19, payment_status = $20,
-               cleaners_count = $21, aggregator = $22
-               WHERE id = $1 RETURNING *`,
-        [
-          id,
-          name,
-          number,
-          email,
-          address,
-          date,
-          onlinePayment,
-          price,
-          estimate,
-          title,
-          counter,
-          subService,
-          total_service_price,
-          total_service_price_original,
-          price_original,
-          note,
-          reward,
-          ownCheckList || false,
-          wasOnlinePaymentChanged ? null : existingOrder.payment_intent,
-          wasOnlinePaymentChanged ? null : existingOrder.payment_status,
-          cleanersCount,
-          aggregator,
-        ]
-      );
+      } =
+        await sql`UPDATE "order" SET name = ${name}, number = ${number}, email = ${email},
+          address = ${address}, date = ${date}, onlinePayment = ${onlinePayment},
+          estimate = ${estimate}, title = ${title}, counter = ${counter}, subService = ${subService},
+          price = ${price}, total_service_price = ${total_service_price},
+          total_service_price_original = ${total_service_price_original},
+          price_original = ${price_original}, note = ${note}, reward = ${reward},
+          own_check_list = ${updatedCheckList}, payment_intent = ${updatedPaymentIntent},
+          payment_status = ${updatedPaymentStatus}, cleaners_count = ${cleanersCount},
+          aggregator = ${aggregator} WHERE id = ${id} RETURNING *`;
 
       const updatedOrdersResult = [{ ...updatedOrder }];
 
       if (connectedOrder) {
         const {
           rows: [updatedConnectedOrder],
-        } = await pool.query(
-          `UPDATE "order" SET name = $2, number = $3, email = $4, address = $5,
-               date = $6, onlinePayment = $7, payment_intent = $8, payment_status = $9 WHERE id = $1 RETURNING *`,
-          [
-            connectedOrder.id,
-            name,
-            number,
-            email,
-            address,
-            date,
-            onlinePayment,
-            wasOnlinePaymentChanged ? null : existingOrder.payment_intent,
-            wasOnlinePaymentChanged ? null : existingOrder.payment_status,
-          ]
-        );
+        } =
+          await sql`UPDATE "order" SET name = ${name}, number = ${number}, email = ${email},
+            address = ${address}, date = ${date}, onlinePayment = ${onlinePayment},
+            payment_intent = ${updatedPaymentIntent}, payment_status = ${updatedPaymentStatus}
+            WHERE id = ${connectedOrder.id} RETURNING *`;
 
         updatedOrdersResult.push({ ...updatedConnectedOrder });
       }
@@ -798,16 +669,12 @@ const OrderController = () => {
       const id = req.params.id;
       const { feedback, rating } = req.body;
 
-      const existingOrder = await pool.query(
-        `SELECT * FROM "order" WHERE id = $1`,
-        [id]
-      );
+      const existingOrder = await sql`SELECT * FROM "order" WHERE id = ${id}`;
 
       if (!existingOrder.rows[0].feedback) {
-        const orderQuery = await pool.query(
-          `UPDATE "order" SET feedback = $2, rating = $3 WHERE id = $1 RETURNING *`,
-          [id, feedback, rating]
-        );
+        const orderQuery =
+          await sql`UPDATE "order" SET feedback = ${feedback}, rating = ${rating}
+            WHERE id = ${id} RETURNING *`;
 
         const updatedOrder = orderQuery.rows[0];
 
@@ -817,10 +684,7 @@ const OrderController = () => {
 
         await Promise.all(
           cleanerIds.map(async (id) => {
-            const userQuery = await pool.query(
-              "SELECT * FROM users WHERE id = $1",
-              [id]
-            );
+            const userQuery = await sql`SELECT * FROM users WHERE id = ${id}`;
             const user = userQuery.rows[0];
 
             if (user) {
@@ -830,10 +694,7 @@ const OrderController = () => {
                 rating
               );
 
-              return await pool.query(
-                "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
-                [id, updatedRating]
-              );
+              return await sql`UPDATE users SET rating = ${updatedRating} WHERE id = ${id} RETURNING *`;
             } else {
               return await Promise.resolve();
             }
@@ -854,10 +715,8 @@ const OrderController = () => {
       const id = req.params.id;
       const userId = req.userId;
 
-      const existingOrderQuery = await pool.query(
-        'SELECT * FROM "order" WHERE id = $1',
-        [id]
-      );
+      const existingOrderQuery =
+        await sql`SELECT * FROM "order" WHERE id = ${id}`;
       const existingOrder = existingOrderQuery.rows[0];
 
       if (!existingOrder) {
@@ -869,10 +728,8 @@ const OrderController = () => {
         .filter((cleanerId) => +cleanerId !== +userId)
         .join(",");
 
-      const result = await pool.query(
-        `UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *`,
-        [id, updatedCleanerIds]
-      );
+      const result =
+        await sql`UPDATE "order" SET cleaner_id = ${updatedCleanerIds} WHERE id = ${id} RETURNING *`;
 
       const updatedOrder = result.rows[0];
 
@@ -889,10 +746,8 @@ const OrderController = () => {
       const id = req.params.id;
       const { extraExpenses } = req.body;
 
-      const result = await pool.query(
-        `UPDATE "order" SET extra_expenses = $2 WHERE id = $1 RETURNING *`,
-        [id, extraExpenses]
-      );
+      const result =
+        await sql`UPDATE "order" SET extra_expenses = ${extraExpenses} WHERE id = ${id} RETURNING *`;
 
       const updatedOrder = result.rows[0];
 
@@ -908,7 +763,7 @@ const OrderController = () => {
 
       const {
         rows: [existingOrder],
-      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await sql`SELECT * FROM "order" WHERE id = ${id}`;
 
       if (!existingOrder) {
         return res.status(404).json({ message: "Order doesn't exist" });
@@ -923,18 +778,10 @@ const OrderController = () => {
       try {
         const {
           rows: [connectedOrder],
-        } = await pool.query(
-          `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
-           and address = $4 and name = $5 and creation_date = $6)`,
-          [
-            id,
-            existingOrder.date,
-            existingOrder.number,
-            existingOrder.address,
-            existingOrder.name,
-            existingOrder.creation_date,
-          ]
-        );
+        } =
+          await sql`SELECT * FROM "order" WHERE (id != ${id}) AND (date = ${existingOrder.date}
+            and number = ${existingOrder.number} and address = ${existingOrder.address}
+            and name = ${existingOrder.name} and creation_date = ${existingOrder.creation_date})`;
 
         const orderIds = connectedOrder
           ? `${existingOrder.id},${connectedOrder.id}`
@@ -957,20 +804,16 @@ const OrderController = () => {
 
         const {
           rows: [updatedOrder],
-        } = await pool.query(
-          `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
-          [id, paymentIntent.id, PAYMENT_STATUS.PENDING]
-        );
+        } = await sql`UPDATE "order" SET payment_intent = ${paymentIntent.id},
+          payment_status = ${PAYMENT_STATUS.PENDING} WHERE id = ${id} RETURNING *`;
 
         const updatedOrdersResult = [{ ...updatedOrder }];
 
         if (connectedOrder) {
           const {
             rows: [updatedConnectedOrder],
-          } = await pool.query(
-            `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
-            [connectedOrder.id, paymentIntent.id, PAYMENT_STATUS.PENDING]
-          );
+          } = await sql`UPDATE "order" SET payment_intent = ${paymentIntent.id},
+            payment_status = ${PAYMENT_STATUS.PENDING} WHERE id = ${connectedOrder.id} RETURNING *`;
 
           updatedOrdersResult.push({ ...updatedConnectedOrder });
         }
@@ -992,7 +835,7 @@ const OrderController = () => {
 
       const {
         rows: [existingOrder],
-      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await sql`SELECT * FROM "order" WHERE id = ${id}`;
 
       if (!existingOrder || !existingOrder.payment_intent) {
         return res.status(404).json({ message: "Order payment doesn't exist" });
@@ -1009,35 +852,25 @@ const OrderController = () => {
       if (needToSyncStatuses) {
         const {
           rows: [updatedOrder],
-        } = await pool.query(
-          `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
-          [id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION]
-        );
+        } =
+          await sql`UPDATE "order" SET payment_status = ${PAYMENT_STATUS.WAITING_FOR_CONFIRMATION}
+            WHERE id = ${id} RETURNING *`;
 
         const updatedOrdersResult = [{ ...updatedOrder }];
 
         const {
           rows: [connectedOrder],
-        } = await pool.query(
-          `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
-           and address = $4 and name = $5 and creation_date = $6)`,
-          [
-            id,
-            existingOrder.date,
-            existingOrder.number,
-            existingOrder.address,
-            existingOrder.name,
-            existingOrder.creation_date,
-          ]
-        );
+        } =
+          await sql`SELECT * FROM "order" WHERE (id != ${id}) AND (date = ${existingOrder.date}
+            and number = ${existingOrder.number} and address = ${existingOrder.address}
+            and name = ${existingOrder.name} and creation_date = ${existingOrder.creation_date})`;
 
         if (connectedOrder) {
           const {
             rows: [updatedConnectedOrder],
-          } = await pool.query(
-            `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
-            [connectedOrder.id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION]
-          );
+          } =
+            await sql`UPDATE "order" SET payment_status = ${PAYMENT_STATUS.WAITING_FOR_CONFIRMATION}
+              WHERE id = ${connectedOrder.id} RETURNING *`;
 
           updatedOrdersResult.push({ ...updatedConnectedOrder });
         }
@@ -1060,7 +893,7 @@ const OrderController = () => {
 
     const {
       rows: [existingOrder],
-    } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+    } = await sql`SELECT * FROM "order" WHERE id = ${id}`;
 
     if (!existingOrder) {
       return res.status(404).json({ message: "Order not found" });
@@ -1068,18 +901,10 @@ const OrderController = () => {
 
     const {
       rows: [connectedOrder],
-    } = await pool.query(
-      `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
-           and address = $4 and name = $5 and creation_date = $6)`,
-      [
-        id,
-        existingOrder.date,
-        existingOrder.number,
-        existingOrder.address,
-        existingOrder.name,
-        existingOrder.creation_date,
-      ]
-    );
+    } =
+      await sql`SELECT * FROM "order" WHERE (id != ${id}) AND (date = ${existingOrder.date}
+        and number = ${existingOrder.number} and address = ${existingOrder.address}
+        and name = ${existingOrder.name} and creation_date = ${existingOrder.creation_date})`;
 
     try {
       if (
@@ -1089,20 +914,18 @@ const OrderController = () => {
 
         const {
           rows: [updatedOrder],
-        } = await pool.query(
-          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-          [existingOrder.id, PAYMENT_STATUS.CONFIRMED]
-        );
+        } =
+          await sql`UPDATE "order" SET payment_status = ${PAYMENT_STATUS.CONFIRMED}
+            WHERE id = ${existingOrder.id} RETURNING *`;
 
         const updatedOrdersResult = [updatedOrder];
 
         if (connectedOrder) {
           const {
             rows: [approvedConnectedOrder],
-          } = await pool.query(
-            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
-          );
+          } =
+            await sql`UPDATE "order" SET payment_status = ${PAYMENT_STATUS.CONFIRMED}
+              WHERE id = ${connectedOrder.id} RETURNING *`;
 
           updatedOrdersResult.push(approvedConnectedOrder);
         }
@@ -1127,7 +950,7 @@ const OrderController = () => {
 
       const {
         rows: [existingOrder],
-      } = await pool.query('SELECT * FROM "order" WHERE id = $1', [id]);
+      } = await sql`SELECT * FROM "order" WHERE id = ${id}`;
 
       if (!existingOrder) {
         return res.status(404).json({ message: "Order not found" });
@@ -1135,35 +958,25 @@ const OrderController = () => {
 
       const {
         rows: [connectedOrder],
-      } = await pool.query(
-        `SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 
-           and address = $4 and name = $5 and creation_date = $6)`,
-        [
-          id,
-          existingOrder.date,
-          existingOrder.number,
-          existingOrder.address,
-          existingOrder.name,
-          existingOrder.creation_date,
-        ]
-      );
+      } =
+        await sql`SELECT * FROM "order" WHERE (id != ${id}) AND (date = ${existingOrder.date}
+          and number = ${existingOrder.number} and address = ${existingOrder.address}
+          and name = ${existingOrder.name} and creation_date = ${existingOrder.creation_date})`;
 
       const {
         rows: [updatedOrder],
-      } = await pool.query(
-        `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
-        [id, PAYMENT_STATUS.CONFIRMED]
-      );
+      } =
+        await sql`UPDATE "order" SET payment_status = ${PAYMENT_STATUS.CONFIRMED}
+          WHERE id = ${id} RETURNING *`;
 
       const updatedOrdersResult = [updatedOrder];
 
       if (connectedOrder) {
         const {
           rows: [approvedConnectedOrder],
-        } = await pool.query(
-          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-          [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
-        );
+        } =
+          await sql`UPDATE "order" SET payment_status = ${PAYMENT_STATUS.CONFIRMED}
+            WHERE id = ${connectedOrder.id} RETURNING *`;
 
         updatedOrdersResult.push(approvedConnectedOrder);
       }

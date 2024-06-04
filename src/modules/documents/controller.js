@@ -1,4 +1,5 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
+
 const fs = require("fs");
 const { put, del } = require("@vercel/blob");
 const { formidable } = require("formidable");
@@ -19,10 +20,8 @@ const DocumentsController = () => {
 
         const srcToFile = fs.readFileSync(file.filepath);
 
-        const existingDocumentQuery = await pool.query(
-          "SELECT * FROM documents WHERE name = $1 AND employee_id = $2",
-          [documentName, userId]
-        );
+        const existingDocumentQuery = await sql`SELECT * FROM documents WHERE
+          name = ${documentName} AND employee_id = ${userId}`;
         const existingDocument = existingDocumentQuery.rows[0];
 
         const uploadedDocument = await put(
@@ -41,20 +40,12 @@ const DocumentsController = () => {
             token: env.getEnvironment("BLOB_TOKEN_DOCUMENTS"),
           });
 
-          await pool.query(
-            "UPDATE documents SET link = $1 WHERE name = $2 AND employee_id = $3 RETURNING *",
-            [uploadedDocument.url, documentName, userId]
-          );
+          await sql`UPDATE documents SET link = ${uploadedDocument.url} WHERE
+            name = ${documentName} AND employee_id = ${userId} RETURNING *`;
         } else {
-          await pool.query(
-            "INSERT INTO documents (link, name, employee_id, file_name) VALUES ($1, $2, $3, $4) RETURNING *",
-            [
-              uploadedDocument.url,
-              documentName,
-              userId,
-              uploadedDocument.pathname,
-            ]
-          );
+          await sql`INSERT INTO documents (link, name, employee_id, file_name)
+            VALUES (${uploadedDocument.url}, ${documentName}, ${userId}, ${uploadedDocument.pathname})
+            RETURNING *`;
         }
 
         return res.status(200).json({
@@ -81,10 +72,8 @@ const DocumentsController = () => {
         token: env.getEnvironment("BLOB_TOKEN_DOCUMENTS"),
       });
 
-      await pool.query(
-        "DELETE FROM documents WHERE name = $1 AND link = $2 AND employee_id = $3 RETURNING *",
-        [name, url, userId]
-      );
+      await sql`DELETE FROM documents WHERE name = ${name} AND link = ${url}
+        AND employee_id = ${userId} RETURNING *`;
 
       return res.status(200).json({ message: "Document was deleted" });
     } catch (error) {
@@ -97,10 +86,8 @@ const DocumentsController = () => {
       req.role !== constants.ROLES.ADMIN ? req.userId : req.params.id;
 
     try {
-      const result = await pool.query(
-        "SELECT * FROM documents WHERE employee_id = $1",
-        [userId]
-      );
+      const result =
+        await sql`SELECT * FROM documents WHERE employee_id = ${userId}`;
 
       return res.json(result.rows);
     } catch (error) {
