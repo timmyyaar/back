@@ -280,10 +280,6 @@ const UsersController = () => {
         "DELETE FROM users WHERE id = $1 RETURNING *",
         [id]
       );
-      await pool.query(
-        'UPDATE "order" SET cleaner_id = null WHERE id = $1 RETURNING *',
-        [id]
-      );
 
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
