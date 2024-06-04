@@ -2,9 +2,9 @@ const { sql } = require("@vercel/postgres");
 
 const nodemailer = require("nodemailer");
 
-const env = require("../../helpers/environments");
-
 const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
+
+const env = require("../../helpers/environments");
 
 const {
   getUpdatedUserRating,
