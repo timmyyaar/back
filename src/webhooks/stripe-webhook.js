@@ -1,4 +1,4 @@
-const pool = require("../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const env = require("../helpers/environments");
 const { PAYMENT_STATUS } = require("../constants");
@@ -33,10 +33,8 @@ const stripeWebhook = async (req, res) => {
     if (paymentIntentMetadata.employeePaymentId) {
       const employeePaymentId = paymentIntentMetadata.employeePaymentId;
 
-      await pool.query(
-        "UPDATE payments SET is_paid = $2, is_failed = $3 WHERE id = $1 RETURNING *",
-        [+employeePaymentId, isPaymentSucceeded, isPaymentFailed]
-      );
+      await sql`UPDATE payments SET is_paid = ${isPaymentSucceeded}, is_failed = ${isPaymentFailed}
+        WHERE id = ${+employeePaymentId} RETURNING *`;
     } else if (paymentIntentMetadata.orderIds) {
       const orderIds =
         paymentIntentMetadata.orderIds.split(",").map((orderId) => +orderId) ||
@@ -56,15 +54,10 @@ const stripeWebhook = async (req, res) => {
             return Promise.resolve();
           }
 
-          await pool.query(
-            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [
-              id,
-              isPaymentFailed
-                ? PAYMENT_STATUS.FAILED
-                : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION,
-            ]
-          );
+          const paymentStatus = isPaymentFailed
+            ? PAYMENT_STATUS.FAILED
+            : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
+          await sql`UPDATE "order" SET payment_status = ${paymentStatus} WHERE id = ${id} RETURNING *`;
         })
       );
     }

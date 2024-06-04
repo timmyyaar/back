@@ -1,11 +1,11 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const constants = require("../../constants");
 
 const LocalesController = () => {
   const getLocales = async (req, res) => {
     try {
-      const result = await pool.query("SELECT * FROM locales");
+      const result = await sql`SELECT * FROM locales`;
 
       return res.json({ locales: result.rows });
     } catch (error) {
@@ -24,19 +24,16 @@ const LocalesController = () => {
       const { key, english, polish, russian, ukrainian } = req.body;
 
       if (key && english && polish && russian && ukrainian) {
-        const localeExists = await pool.query(
-          "SELECT * FROM locales WHERE key = $1",
-          [key]
-        );
+        const localeExists =
+          await sql`SELECT * FROM locales WHERE key = ${key}`;
 
         if (localeExists.rowCount > 0) {
           res.status(409).json({ message: "Locale already exists" });
         } else {
-          const result = await pool.query(
-            `INSERT INTO locales (key, value, locale) VALUES ($1, $2, $6), 
-             ($1, $3, $7), ($1, $4, $8), ($1, $5, $9) RETURNING *`,
-            [key, english, polish, russian, ukrainian, "en", "pl", "ru", "ua"]
-          );
+          const result =
+            await sql`INSERT INTO locales (key, value, locale) VALUES (${key}, ${english}, ${"en"}), 
+              (${key}, ${polish}, ${"pl"}), (${key}, ${russian}, ${"ru"}),
+              (${key}, ${ukrainian}, ${"ua"}) RETURNING *`;
 
           res.status(200).json(result.rows);
         }
@@ -59,22 +56,18 @@ const LocalesController = () => {
       const { key, english, russian, polish, ukrainian } = req.body;
 
       if (key && english && russian && polish && ukrainian) {
-        const resultEnglish = await pool.query(
-          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, english, "en"]
-        );
-        const resultPolish = await pool.query(
-          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, polish, "pl"]
-        );
-        const resultRussian = await pool.query(
-          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, russian, "ru"]
-        );
-        const resultUkrainian = await pool.query(
-          "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, ukrainian, "ua"]
-        );
+        const resultEnglish =
+          await sql`UPDATE locales SET value = ${english} WHERE
+            key = ${key} AND locale = ${"en"} RETURNING *`;
+        const resultPolish =
+          await sql`UPDATE locales SET value = ${polish} WHERE
+            key = ${key} AND locale = ${"pl"} RETURNING *`;
+        const resultRussian =
+          await sql`UPDATE locales SET value = ${russian} WHERE
+            key = ${key} AND locale = ${"ru"} RETURNING *`;
+        const resultUkrainian =
+          await sql`UPDATE locales SET value = ${ukrainian} WHERE
+            key = ${key} AND locale = ${"ua"} RETURNING *`;
 
         res
           .status(200)
@@ -102,10 +95,7 @@ const LocalesController = () => {
     try {
       const { key } = req.body;
 
-      const result = await pool.query(
-        "DELETE FROM locales WHERE key = $1 RETURNING *",
-        [key]
-      );
+      const result = await sql`DELETE FROM locales WHERE key = ${key} RETURNING *`
 
       res
         .status(200)

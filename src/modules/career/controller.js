@@ -1,4 +1,4 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const constants = require("../../constants");
 
@@ -27,7 +27,7 @@ const CareersController = () => {
     }
 
     try {
-      const result = await pool.query("SELECT * FROM careers");
+      const result = await sql`SELECT * FROM careers`;
 
       return res.json(result.rows);
     } catch (error) {
@@ -40,10 +40,9 @@ const CareersController = () => {
       const { name, phone, email, about = "", referralCode = null } = req.body;
 
       if (name && phone && email) {
-        const result = await pool.query(
-          "INSERT INTO careers(name, phone, email, about, referral_code) VALUES($1, $2, $3, $4, $5) RETURNING *",
-          [name, phone, email, about, referralCode]
-        );
+        const result =
+          await sql`INSERT INTO careers(name, phone, email, about, referral_code)
+            VALUES(${name}, ${phone}, ${email}, ${about}, ${referralCode}) RETURNING *`;
 
         if (env.getEnvironment("MODE") === "prod") {
           await sendTelegramMessage();
@@ -68,10 +67,8 @@ const CareersController = () => {
     try {
       const { id } = req.params;
 
-      const result = await pool.query(
-        "DELETE FROM careers WHERE id = $1 RETURNING *",
-        [id]
-      );
+      const result =
+        await sql`DELETE FROM careers WHERE id = ${id} RETURNING *`;
 
       return res
         .status(200)
