@@ -42,7 +42,7 @@ const stripeWebhook = async (req, res) => {
 
       await Promise.all(
         orderIds.map(async (id) => {
-          const orderQuery = await client.query(
+          const orderQuery = await pool.query(
             'SELECT * FROM "order" WHERE id = $1',
             [id]
           );
@@ -50,14 +50,17 @@ const stripeWebhook = async (req, res) => {
 
           const existingPaymentIntent = order?.payment_intent;
 
-          if (!existingPaymentIntent) {
-            return Promise.resolve();
-          }
+          const shouldSkip =
+            !existingPaymentIntent ||
+            order.payment_status === PAYMENT_STATUS.CONFIRMED;
 
-          const paymentStatus = isPaymentFailed
-            ? PAYMENT_STATUS.FAILED
-            : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
-          await sql`UPDATE "order" SET payment_status = ${paymentStatus} WHERE id = ${id} RETURNING *`;
+          if (!shouldSkip) {
+            const paymentStatus = isPaymentFailed
+              ? PAYMENT_STATUS.FAILED
+              : PAYMENT_STATUS.WAITING_FOR_CONFIRMATION;
+
+            await sql`UPDATE "order" SET payment_status = ${paymentStatus} WHERE id = ${id} RETURNING *`;
+          }
         })
       );
     }
