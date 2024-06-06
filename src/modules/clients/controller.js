@@ -3,7 +3,7 @@ const { sql } = require("@vercel/postgres");
 const ClientsController = () => {
   const getClients = async (req, res) => {
     try {
-      const clients = await sql`SELECT * FROM clients`;
+      const clients = await sql`SELECT * FROM clients ORDER BY id DESC`;
 
       res.status(200).json(clients.rows);
     } catch (error) {
