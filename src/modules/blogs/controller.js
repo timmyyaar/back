@@ -1,4 +1,5 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
+
 const fs = require("fs");
 const { put, del } = require("@vercel/blob");
 const { formidable } = require("formidable");
@@ -11,8 +12,8 @@ const BlogsController = () => {
 
     try {
       const result = id
-        ? await pool.query("SELECT * FROM blogs WHERE id = $1", [id])
-        : await pool.query("SELECT * FROM blogs ORDER BY id DESC");
+        ? await sql`SELECT * FROM blogs WHERE id = ${id}`
+        : await sql`SELECT * FROM blogs ORDER BY id DESC`;
 
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "No blogs found" });
@@ -68,20 +69,20 @@ const BlogsController = () => {
           }
         );
 
-        const newBlogQuery = await pool.query(
-          `INSERT INTO blogs (title, category, main_image, date, blog_image_one,
-             blog_image_two, read_time, text) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-          [
-            fields.title[0],
-            fields.category[0],
-            uploadedMainImage.url,
-            fields.date[0],
-            uploadedBlogImageOne.url,
-            uploadedBlogImageTwo.url,
-            fields.readTime[0],
-            fields.text[0],
-          ]
-        );
+        const newBlogTitle = fields.title[0];
+        const newBlogCategory = fields.category[0];
+        const newBlogMainImage = uploadedMainImage.url;
+        const newBlogDate = fields.date[0];
+        const newBlogImageOne = uploadedBlogImageOne.url;
+        const newBlogImageTwo = uploadedBlogImageTwo.url;
+        const newBlogReadTime = fields.readTime[0];
+        const newBlogText = fields.text[0];
+
+        const newBlogQuery =
+          await sql`INSERT INTO blogs (title, category, main_image, date, blog_image_one,
+            blog_image_two, read_time, text) VALUES (${newBlogTitle}, ${newBlogCategory},
+            ${newBlogMainImage}, ${newBlogDate}, ${newBlogImageOne}, ${newBlogImageTwo},
+            ${newBlogReadTime}, ${newBlogText}) RETURNING *`;
 
         return res.status(200).json(newBlogQuery.rows[0]);
       });
@@ -111,10 +112,8 @@ const BlogsController = () => {
           ? fs.readFileSync(blogImageTwo.filepath)
           : null;
 
-        const existingBlogQuery = await pool.query(
-          "SELECT * FROM blogs WHERE id = $1",
-          [id]
-        );
+        const existingBlogQuery =
+          await sql`SELECT * FROM blogs WHERE id = ${id}`;
         const existingBlog = existingBlogQuery.rows[0];
 
         const uploadedMainImage = srcToMainImage
@@ -154,26 +153,26 @@ const BlogsController = () => {
             )
           : null;
 
-        const newBlogQuery = await pool.query(
-          `UPDATE blogs SET title = $2, category = $3, main_image = $4,
-              date = $5, blog_image_one = $6, blog_image_two = $7, read_time = $8,
-              text = $9 WHERE id = $1 RETURNING *`,
-          [
-            id,
-            fields.title[0],
-            fields.category[0],
-            uploadedMainImage ? uploadedMainImage.url : fields.image[0],
-            fields.date[0],
-            uploadedBlogImageOne
-              ? uploadedBlogImageOne.url
-              : fields.imageOne[0],
-            uploadedBlogImageTwo
-              ? uploadedBlogImageTwo.url
-              : fields.imageTwo[0],
-            fields.readTime[0],
-            fields.text[0],
-          ]
-        );
+        const updatedBlogTitle = fields.title[0];
+        const updatedBlogCategory = fields.category[0];
+        const updatedBlogMainImage = uploadedMainImage
+          ? uploadedMainImage.url
+          : fields.image[0];
+        const updatedBlogDate = fields.date[0];
+        const updatedBlogImageOne = uploadedBlogImageOne
+          ? uploadedBlogImageOne.url
+          : fields.imageOne[0];
+        const updatedBlogImageTwo = uploadedBlogImageTwo
+          ? uploadedBlogImageTwo.url
+          : fields.imageTwo[0];
+        const updatedBlogReadTime = fields.readTime[0];
+        const updatedBlogText = fields.text[0];
+
+        const newBlogQuery =
+          await sql`UPDATE blogs SET title = ${updatedBlogTitle}, category = ${updatedBlogCategory},
+            main_image = ${updatedBlogMainImage}, date = ${updatedBlogDate},
+            blog_image_one = ${updatedBlogImageOne}, blog_image_two = ${updatedBlogImageTwo},
+            read_time = ${updatedBlogReadTime}, text = ${updatedBlogText} WHERE id = ${id} RETURNING *`;
 
         if (mainImage) {
           await del(existingBlog.main_image, {
@@ -205,10 +204,7 @@ const BlogsController = () => {
     const { id } = req.params;
 
     try {
-      const existingBlogQuery = await pool.query(
-        "SELECT * FROM blogs WHERE id = $1",
-        [id]
-      );
+      const existingBlogQuery = await sql`SELECT * FROM blogs WHERE id = ${id}`;
       const existingBlog = existingBlogQuery.rows[0];
 
       await del(existingBlog.main_image, {
@@ -221,7 +217,7 @@ const BlogsController = () => {
         token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
       });
 
-      await pool.query("DELETE FROM blogs WHERE id = $1", [id]);
+      await sql`DELETE FROM blogs WHERE id = ${id}`;
 
       return res.status(200).json({ message: "Blog was deleted" });
     } catch (error) {

@@ -1,9 +1,9 @@
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const PromoController = () => {
   const getAllPromo = async (_, res) => {
     try {
-      const result = await pool.query("SELECT * FROM promo ORDER BY id DESC");
+      const result = await sql`SELECT * FROM promo ORDER BY id DESC`;
 
       res.json(result.rows);
     } catch (error) {
@@ -14,9 +14,7 @@ const PromoController = () => {
   const getPromoByCode = async (req, res) => {
     try {
       const { code } = req.params;
-      const result = await pool.query("SELECT * FROM promo WHERE code = $1", [
-        code,
-      ]);
+      const result = await sql`SELECT * FROM promo WHERE code = ${code}`;
       const promo = result.rows[0];
 
       if (!promo) {
@@ -35,20 +33,16 @@ const PromoController = () => {
     try {
       const { code, author, sale, count } = req.body;
 
-      const existingPromoQuery = await pool.query(
-        "SELECT * FROM promo WHERE code = $1",
-        [code]
-      );
+      const existingPromoQuery =
+        await sql`SELECT * FROM promo WHERE code = ${code}`;
       const existingPromo = existingPromoQuery.rows[0];
 
       if (existingPromo) {
         return res.status(409).json({ message: "Promo already exists!" });
       }
 
-      const result = await pool.query(
-        "INSERT INTO promo (code, author, sale, count) VALUES ($1, $2, $3, $4) RETURNING *",
-        [code, author, sale, count]
-      );
+      const result = await sql`INSERT INTO promo (code, author, sale, count)
+        VALUES (${code}, ${author}, ${sale}, ${count}) RETURNING *`;
 
       return res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -59,10 +53,7 @@ const PromoController = () => {
   const deletePromo = async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await pool.query(
-        "DELETE FROM promo WHERE id = $1 RETURNING *",
-        [id]
-      );
+      const result = await sql`DELETE FROM promo WHERE id = ${id} RETURNING *`
 
       if (result.rows.length === 0) {
         res.status(404).json({ message: "Promo not found" });
