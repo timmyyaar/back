@@ -3,7 +3,9 @@ const pool = require("../../db/pool");
 const ClientsController = () => {
   const getClients = async (req, res) => {
     try {
-      const clients = await pool.query("SELECT * FROM clients");
+      const clients = await pool.query(
+        "SELECT * FROM clients ORDER BY id DESC"
+      );
 
       res.status(200).json(clients.rows);
     } catch (error) {
