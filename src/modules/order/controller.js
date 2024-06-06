@@ -100,8 +100,6 @@ const OrderController = () => {
           .json({ message: "You don't have access to this" });
       }
 
-      console.log(clientName, clientPhone)
-
       const { rows: clientOrders } = await pool.query(
         'SELECT * FROM "order" WHERE name = $1 AND number = $2',
         [clientName, clientPhone]
