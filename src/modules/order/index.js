@@ -11,6 +11,11 @@ orderRouter
   .patch("/order/:id/send-feedback", orderController.sendFeedback)
   .get("/order/client-order", orderController.getClientOrder)
   .get("/order", verifyToken, orderController.getOrder)
+  .get(
+    "/order/client-orders/get-all",
+    verifyToken,
+    orderController.getAllClientOrders
+  )
   .put("/order/:id", verifyToken, orderController.updateOrder)
   .delete("/order/:id", verifyToken, orderController.deleteOrder)
   .patch("/order/refuse/:id", verifyToken, orderController.refuseOrder)
