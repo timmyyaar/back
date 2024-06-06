@@ -97,7 +97,8 @@ const OrderController = () => {
           .json({ message: "You don't have access to this" });
       }
 
-      const { rows: clientOrders } = sql`SELECT * FROM "order" WHERE name = ${clientName} AND number = ${clientPhone}`;
+      const { rows: clientOrders } =
+        await sql`SELECT * FROM "order" WHERE name = ${clientName} AND number = ${clientPhone}`;
 
       return res.status(200).json(getOrdersWithCleaners(clientOrders));
     } catch (error) {
