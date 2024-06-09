@@ -8,6 +8,7 @@ const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
 const {
   getUpdatedUserRating,
   getDateTimeObjectFromString,
+  getDateTimeString,
 } = require("../../utils");
 
 const {
@@ -138,7 +139,7 @@ const OrderController = () => {
         secondServiceEstimate,
         secondServiceCleanersCount,
         language,
-        creationDate,
+        creationDate = getDateTimeString(new Date()),
         ownCheckList = false,
         paymentIntentId = null,
         mainServiceManualCleanersCount,

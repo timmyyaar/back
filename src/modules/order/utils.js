@@ -225,7 +225,6 @@ const getSubServicesList = (subServices) =>
 const getOrderCheckList = (order) => {
   switch (order.title) {
     case ORDER_TYPES.REGULAR:
-    case ORDER_TYPES.LAST_MINUTE:
     case ORDER_TYPES.ECO:
     case ORDER_TYPES.AIRBNB:
     case ORDER_TYPES.AFTER_PARTY:

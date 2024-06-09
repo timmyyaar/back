@@ -19,7 +19,6 @@ const ORDER_TYPES = {
   DEEP: "Deep",
   MOVE: "Move in/out",
   AFTER_PARTY: "After party",
-  LAST_MINUTE: "In a last minute",
   WHILE_SICK: "While sickness",
   AIRBNB: "Airbnb",
   OZONATION: "Ozonation",
