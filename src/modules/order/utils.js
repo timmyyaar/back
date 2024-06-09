@@ -146,7 +146,7 @@ const getUpdatedScheduleDetailsForEdit = (existingSchedule, scheduleParts) => {
     ? scheduleParts.fourthPeriodAdditional
     : existingSchedule.fourth_period_additional;
 
-  return [
+  return {
     updatedFirstPeriod,
     updatedSecondPeriod,
     updatedThirdPeriod,
@@ -155,11 +155,7 @@ const getUpdatedScheduleDetailsForEdit = (existingSchedule, scheduleParts) => {
     updatedSecondPeriodAdditional,
     updatedThirdPeriodAdditional,
     updatedFourthPeriodAdditional,
-    !scheduleParts.firstPeriod,
-    !scheduleParts.secondPeriod,
-    !scheduleParts.thirdPeriod,
-    !scheduleParts.fourthPeriod,
-  ];
+  };
 };
 
 const getUpdatedScheduleDetailsForDelete = (
@@ -196,7 +192,7 @@ const getUpdatedScheduleDetailsForDelete = (
     ? null
     : existingSchedule.fourth_period_additional;
 
-  return [
+  return {
     updatedFirstPeriod,
     updatedSecondPeriod,
     updatedThirdPeriod,
@@ -205,15 +201,19 @@ const getUpdatedScheduleDetailsForDelete = (
     updatedSecondPeriodAdditional,
     updatedThirdPeriodAdditional,
     updatedFourthPeriodAdditional,
-    !scheduleParts.firstPeriod ? false : existingSchedule.is_first_period_order,
-    !scheduleParts.secondPeriod
+    isFirstPeriodOrder: !scheduleParts.firstPeriod
+      ? false
+      : existingSchedule.is_first_period_order,
+    isSecondPeriodOrder: !scheduleParts.secondPeriod
       ? false
       : existingSchedule.is_second_period_order,
-    !scheduleParts.thirdPeriod ? false : existingSchedule.is_third_period_order,
-    !scheduleParts.fourthPeriod
+    isThirdPeriodOrder: !scheduleParts.thirdPeriod
+      ? false
+      : existingSchedule.is_third_period_order,
+    isFourthPeriodOrder: !scheduleParts.fourthPeriod
       ? false
       : existingSchedule.is_fourth_period_order,
-  ];
+  };
 };
 
 const getSubServicesList = (subServices) =>

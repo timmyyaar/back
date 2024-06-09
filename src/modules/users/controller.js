@@ -1,14 +1,14 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
+const { sql } = require("@vercel/postgres");
+
 const env = require("../../helpers/environments");
 
 const stripe = require("stripe")(env.getEnvironment("STRIPE_CONNECTION_KEY"));
 
 const constants = require("../../constants");
 const { getUpdatedUserRating } = require("../../utils");
-
-const pool = require("../../db/pool");
 
 const AUTH_COOKIE_EXPIRATION_TIME = 7 * 24 * 60 * 60 * 1000;
 
@@ -37,20 +37,16 @@ const UsersController = () => {
         password: await bcrypt.hash(password, 10),
       };
 
-      const userQuery = await pool.query(
-        "SELECT * FROM users WHERE email = $1",
-        [email]
-      );
+      const userQuery = await sql`SELECT * FROM users WHERE email = ${email}`;
       const existingUser = userQuery.rows[0];
 
       if (existingUser) {
         return res.status(409).send("User with such email already exists!");
       }
 
-      const result = await pool.query(
-        "INSERT INTO users(email, password, role) VALUES($1, $2, $3) RETURNING *",
-        [data.email, data.password, "admin"]
-      );
+      const result =
+        await sql`INSERT INTO users(email, password, role) VALUES(${data.email},
+        ${data.password}, ${"admin"}) RETURNING *`;
 
       if (result.rows[0]) {
         return res.status(201).send(result.rows[0]);
@@ -66,10 +62,7 @@ const UsersController = () => {
     try {
       const { email, password } = req.body;
 
-      const userQuery = await pool.query(
-        "SELECT * FROM users WHERE email = $1",
-        [email]
-      );
+      const userQuery = await sql`SELECT * FROM users WHERE email = ${email}`;
       const existingUser = userQuery.rows[0];
 
       if (existingUser) {
@@ -123,7 +116,7 @@ const UsersController = () => {
     }
 
     try {
-      const result = await pool.query("SELECT * FROM users ORDER BY id ASC");
+      const result = await sql`SELECT * FROM users ORDER BY id ASC`;
 
       res.json(result.rows.map(getUserWithRating));
     } catch (error) {
@@ -133,9 +126,7 @@ const UsersController = () => {
 
   const getMyUser = async (req, res) => {
     try {
-      const result = await pool.query("SELECT * FROM users WHERE id = $1", [
-        req.userId,
-      ]);
+      const result = await sql`SELECT * FROM users WHERE id = ${req.userId}`;
       const user = getUserWithRating(result.rows[0]);
 
       res.json({
@@ -176,10 +167,7 @@ const UsersController = () => {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const userQuery = await pool.query(
-        "SELECT * FROM users WHERE email = $1",
-        [email]
-      );
+      const userQuery = await sql`SELECT * FROM users WHERE email = ${email}`;
       const existingUser = userQuery.rows[0];
 
       if (existingUser) {
@@ -197,20 +185,11 @@ const UsersController = () => {
         email,
       });
 
-      const result = await pool.query(
-        `INSERT INTO users(email, password, role, have_vacuum_cleaner,
-         have_car, first_name, last_name, customer_id) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [
-          email,
-          hashedPassword,
-          role,
-          haveVacuumCleaner,
-          haveCar,
-          firstName,
-          lastName,
-          customer.id,
-        ]
-      );
+      const result =
+        await sql`INSERT INTO users(email, password, role, have_vacuum_cleaner,
+          have_car, first_name, last_name, customer_id)
+          VALUES(${email}, ${hashedPassword}, ${role}, ${haveVacuumCleaner}, ${haveCar},
+          ${firstName}, ${lastName}, ${customer.id}) RETURNING *`;
 
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
@@ -230,11 +209,10 @@ const UsersController = () => {
         req.body;
       const id = req.params.id;
 
-      const result = await pool.query(
-        `UPDATE users SET role = $2, have_vacuum_cleaner = $3, have_car = $4,
-           first_name = $5, last_name = $6 WHERE id = $1 RETURNING *`,
-        [id, role, haveVacuumCleaner, haveCar, firstName, lastName]
-      );
+      const result =
+        await sql`UPDATE users SET role = ${role}, have_vacuum_cleaner = ${haveVacuumCleaner},
+          have_car = ${haveCar}, first_name = ${firstName}, last_name = ${lastName}
+          WHERE id = ${id} RETURNING *`;
 
       return res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
@@ -255,10 +233,8 @@ const UsersController = () => {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const result = await pool.query(
-        "UPDATE users SET password = $2 WHERE id = $1 RETURNING *",
-        [id, hashedPassword]
-      );
+      const result =
+        await sql`UPDATE users SET password = ${hashedPassword} WHERE id = ${id} RETURNING *`;
 
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
@@ -276,10 +252,7 @@ const UsersController = () => {
     try {
       const id = req.params.id;
 
-      const result = await pool.query(
-        "DELETE FROM users WHERE id = $1 RETURNING *",
-        [id]
-      );
+      const result = await sql`DELETE FROM users WHERE id = ${id} RETURNING *`;
 
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {
@@ -298,17 +271,13 @@ const UsersController = () => {
       const { rating } = req.body;
       const id = req.params.id;
 
-      const userQuery = await pool.query("SELECT * FROM users WHERE id = $1", [
-        id,
-      ]);
+      const userQuery = await sql`SELECT * FROM users WHERE id = ${id}`;
       const existingUser = userQuery.rows[0];
       const currentUserRating = existingUser.rating || "";
       const updatedRating = getUpdatedUserRating(currentUserRating, rating);
 
-      const result = await pool.query(
-        "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
-        [id, updatedRating]
-      );
+      const result =
+        await sql`UPDATE users SET rating = ${updatedRating} WHERE id = ${id} RETURNING *`;
 
       res.status(200).json(getUserWithRating(result.rows[0]));
     } catch (error) {

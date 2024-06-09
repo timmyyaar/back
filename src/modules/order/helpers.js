@@ -1,6 +1,6 @@
 const schedule = require("node-schedule");
 
-const pool = require("../../db/pool");
+const { sql } = require("@vercel/postgres");
 
 const env = require("../../helpers/environments");
 const { getDateTimeString } = require("../../utils");
@@ -146,10 +146,8 @@ const sendFeedbackEmailAndSetReminder = async (
     });
   }
 
-  const existingReminderQuery = await pool.query(
-    "SELECT * FROM reminders WHERE email = $1",
-    [updatedOrder.email]
-  );
+  const existingReminderQuery =
+    await sql`SELECT * FROM reminders WHERE email = ${updatedOrder.email}`;
   const existingReminder = existingReminderQuery.rows[0];
   const nextReminderDate = new Date(
     new Date().setMinutes(new Date().getMinutes() - 1)
@@ -157,23 +155,100 @@ const sendFeedbackEmailAndSetReminder = async (
   const dateInMonth = getDateTimeString(nextReminderDate);
 
   if (existingReminder) {
-    await pool.query("UPDATE reminders SET date = $2 WHERE id = $1", [
-      existingReminder.id,
-      dateInMonth,
-    ]);
+    await sql`UPDATE reminders SET date = ${dateInMonth} WHERE id = ${existingReminder.id}`;
   } else {
-    await pool.query(
-      "INSERT INTO reminders(email, date, language, name) VALUES($1, $2, $3, $4)",
-      [
-        updatedOrder.email,
-        dateInMonth,
-        updatedOrder.language,
-        updatedOrder.name,
-      ]
-    );
+    await sql`INSERT INTO reminders(email, date, language, name)
+      VALUES(${updatedOrder.email}, ${dateInMonth}, ${updatedOrder.language}, ${updatedOrder.name})`;
   }
 
   scheduleReminder(nextReminderDate, updatedOrder);
+};
+
+const addOrUpdateSchedule = async (
+  existingSchedule,
+  scheduleParts,
+  cleanerId,
+  orderDate
+) => {
+  const isFirstPeriodOrder = !scheduleParts.firstPeriod;
+  const isSecondPeriodOrder = !scheduleParts.secondPeriod;
+  const isThirdPeriodOrder = !scheduleParts.thirdPeriod;
+  const isFourthPeriodOrder = !scheduleParts.fourthPeriod;
+
+  if (existingSchedule) {
+    const {
+      updatedFirstPeriod,
+      updatedSecondPeriod,
+      updatedThirdPeriod,
+      updatedFourthPeriod,
+      updatedFirstPeriodAdditional,
+      updatedSecondPeriodAdditional,
+      updatedThirdPeriodAdditional,
+      updatedFourthPeriodAdditional,
+    } = getUpdatedScheduleDetailsForEdit(existingSchedule, scheduleParts);
+
+    await sql`UPDATE schedule SET date = ${existingSchedule.date}, first_period = ${updatedFirstPeriod},
+      second_period = ${updatedSecondPeriod}, third_period = ${updatedThirdPeriod},
+      fourth_period = ${updatedFourthPeriod}, first_period_additional = ${updatedFirstPeriodAdditional},
+      second_period_additional = ${updatedSecondPeriodAdditional},
+      third_period_additional = ${updatedThirdPeriodAdditional},
+      fourth_period_additional = ${updatedFourthPeriodAdditional},
+      is_first_period_order = ${isFirstPeriodOrder},
+      is_second_period_order = ${isSecondPeriodOrder}, is_third_period_order = ${isThirdPeriodOrder},
+      is_fourth_period_order = ${isFourthPeriodOrder}
+      WHERE id = ${existingSchedule.id} RETURNING *`;
+  } else {
+    const {
+      firstPeriod,
+      secondPeriod,
+      thirdPeriod,
+      fourthPeriod,
+      firstPeriodAdditional,
+      secondPeriodAdditional,
+      thirdPeriodAdditional,
+      fourthPeriodAdditional,
+    } = scheduleParts;
+
+    await sql`INSERT INTO schedule (employee_id, date, first_period, second_period,
+      third_period, fourth_period, first_period_additional,
+      second_period_additional, third_period_additional, fourth_period_additional,
+      is_first_period_order, is_second_period_order, is_third_period_order, is_fourth_period_order)
+      VALUES (${+cleanerId}, ${orderDate}, ${firstPeriod}, ${secondPeriod}, ${thirdPeriod},
+      ${fourthPeriod}, ${firstPeriodAdditional}, ${secondPeriodAdditional}, ${thirdPeriodAdditional},
+      ${fourthPeriodAdditional}, ${isFirstPeriodOrder}, ${isSecondPeriodOrder},
+      ${isThirdPeriodOrder}, ${isFourthPeriodOrder}) RETURNING *`;
+  }
+};
+
+const deleteSchedule = async (existingSchedule, scheduleParts) => {
+  if (existingSchedule) {
+    const {
+      updatedFirstPeriod,
+      updatedSecondPeriod,
+      updatedThirdPeriod,
+      updatedFourthPeriod,
+      updatedFirstPeriodAdditional,
+      updatedSecondPeriodAdditional,
+      updatedThirdPeriodAdditional,
+      updatedFourthPeriodAdditional,
+      isFirstPeriodOrder,
+      isSecondPeriodOrder,
+      isThirdPeriodOrder,
+      isFourthPeriodOrder,
+    } = getUpdatedScheduleDetailsForDelete(existingSchedule, scheduleParts);
+
+    await sql`UPDATE schedule SET date = ${existingSchedule.date}, first_period = ${updatedFirstPeriod},
+      second_period = ${updatedSecondPeriod}, third_period = ${updatedThirdPeriod},
+      fourth_period = ${updatedFourthPeriod}, first_period_additional = ${updatedFirstPeriodAdditional},
+      second_period_additional = ${updatedSecondPeriodAdditional},
+      third_period_additional = ${updatedThirdPeriodAdditional},
+      fourth_period_additional = ${updatedFourthPeriodAdditional},
+      is_first_period_order = ${isFirstPeriodOrder},
+      is_second_period_order = ${isSecondPeriodOrder},
+      is_third_period_order = ${isThirdPeriodOrder},
+      is_fourth_period_order = ${isFourthPeriodOrder}
+      WHERE id = ${existingSchedule.id} RETURNING *`;
+  }
 };
 
 const addOrderToSchedule = async (existingOrder, cleanerId) => {
@@ -182,51 +257,17 @@ const addOrderToSchedule = async (existingOrder, cleanerId) => {
 
   const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-  const existingScheduleQuery = await pool.query(
-    "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-    [cleanerId, orderDate]
-  );
-  const existingSchedule = existingScheduleQuery.rows[0];
+  const {
+    rows: [existingSchedule],
+  } = await sql`SELECT * FROM schedule WHERE
+   employee_id = ${cleanerId} AND date = ${orderDate}`;
 
-  if (existingSchedule) {
-    await pool.query(
-      `UPDATE schedule SET date = $2, first_period = $3,
-           second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-           second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-           is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-           is_fourth_period_order = $14
-           WHERE id = $1 RETURNING *`,
-      [
-        existingSchedule.id,
-        existingSchedule.date,
-        ...getUpdatedScheduleDetailsForEdit(existingSchedule, scheduleParts),
-      ]
-    );
-  } else {
-    await pool.query(
-      `INSERT INTO schedule (employee_id, date, first_period, second_period,
-           third_period, fourth_period, first_period_additional,
-           second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
-           is_second_period_order, is_third_period_order, is_fourth_period_order)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [
-        +cleanerId,
-        orderDate,
-        scheduleParts.firstPeriod,
-        scheduleParts.secondPeriod,
-        scheduleParts.thirdPeriod,
-        scheduleParts.fourthPeriod,
-        scheduleParts.firstPeriodAdditional,
-        scheduleParts.secondPeriodAdditional,
-        scheduleParts.thirdPeriodAdditional,
-        scheduleParts.fourthPeriodAdditional,
-        !scheduleParts.firstPeriod,
-        !scheduleParts.secondPeriod,
-        !scheduleParts.thirdPeriod,
-        !scheduleParts.fourthPeriod,
-      ]
-    );
-  }
+  await addOrUpdateSchedule(
+    existingSchedule,
+    scheduleParts,
+    +cleanerId,
+    orderDate
+  );
 };
 
 const removeOrderFromSchedule = async (existingOrder, userId) => {
@@ -235,27 +276,12 @@ const removeOrderFromSchedule = async (existingOrder, userId) => {
 
   const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-  const existingScheduleQuery = await pool.query(
-    "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-    [+userId, orderDate]
-  );
-  const existingSchedule = existingScheduleQuery.rows[0];
+  const {
+    rows: [existingSchedule],
+  } = await sql`SELECT * FROM schedule WHERE
+    employee_id = ${+userId} AND date = ${orderDate}`;
 
-  if (existingSchedule) {
-    await pool.query(
-      `UPDATE schedule SET date = $2, first_period = $3,
-                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-                   is_fourth_period_order = $14
-                   WHERE id = $1 RETURNING *`,
-      [
-        existingSchedule.id,
-        existingSchedule.date,
-        ...getUpdatedScheduleDetailsForDelete(existingSchedule, scheduleParts),
-      ]
-    );
-  }
+  await deleteSchedule(existingSchedule, scheduleParts);
 };
 
 const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
@@ -280,54 +306,17 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
 
           const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-          const existingScheduleQuery = await pool.query(
-            "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-            [cleaner, orderDate]
-          );
-          const existingSchedule = existingScheduleQuery.rows[0];
+          const {
+            rows: [existingSchedule],
+          } =
+            await sql`SELECT * FROM schedule WHERE employee_id = ${cleaner} AND date = ${orderDate}`;
 
-          if (existingSchedule) {
-            await pool.query(
-              `UPDATE schedule SET date = $2, first_period = $3,
-                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-                   is_fourth_period_order = $14
-                   WHERE id = $1 RETURNING *`,
-              [
-                existingSchedule.id,
-                existingSchedule.date,
-                ...getUpdatedScheduleDetailsForEdit(
-                  existingSchedule,
-                  scheduleParts
-                ),
-              ]
-            );
-          } else {
-            await pool.query(
-              `INSERT INTO schedule (employee_id, date, first_period, second_period,
-                third_period, fourth_period, first_period_additional,
-                second_period_additional, third_period_additional, fourth_period_additional, is_first_period_order,
-                is_second_period_order, is_third_period_order, is_fourth_period_order)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-              [
-                cleaner,
-                orderDate,
-                scheduleParts.firstPeriod,
-                scheduleParts.secondPeriod,
-                scheduleParts.thirdPeriod,
-                scheduleParts.fourthPeriod,
-                scheduleParts.firstPeriodAdditional,
-                scheduleParts.secondPeriodAdditional,
-                scheduleParts.thirdPeriodAdditional,
-                scheduleParts.fourthPeriodAdditional,
-                !scheduleParts.firstPeriod,
-                !scheduleParts.secondPeriod,
-                !scheduleParts.thirdPeriod,
-                !scheduleParts.fourthPeriod,
-              ]
-            );
-          }
+          await addOrUpdateSchedule(
+            existingSchedule,
+            scheduleParts,
+            cleaner,
+            orderDate
+          );
         })
       );
     } else {
@@ -338,30 +327,12 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
 
           const scheduleParts = getSchedulePartsByOrder(existingOrder);
 
-          const existingScheduleQuery = await pool.query(
-            "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-            [cleaner, orderDate]
-          );
-          const existingSchedule = existingScheduleQuery.rows[0];
+          const {
+            rows: [existingSchedule],
+          } =
+            await sql`SELECT * FROM schedule WHERE employee_id = ${cleaner} AND date = ${orderDate}`;
 
-          if (existingSchedule) {
-            await pool.query(
-              `UPDATE schedule SET date = $2, first_period = $3,
-                   second_period = $4, third_period = $5, fourth_period = $6, first_period_additional = $7,
-                   second_period_additional = $8, third_period_additional = $9, fourth_period_additional = $10,
-                   is_first_period_order = $11, is_second_period_order = $12, is_third_period_order = $13,
-                   is_fourth_period_order = $14
-                   WHERE id = $1 RETURNING *`,
-              [
-                existingSchedule.id,
-                existingSchedule.date,
-                ...getUpdatedScheduleDetailsForDelete(
-                  existingSchedule,
-                  scheduleParts
-                ),
-              ]
-            );
-          }
+          await deleteSchedule(existingSchedule, scheduleParts);
         })
       );
     }

@@ -37,12 +37,18 @@ const router = require("./router");
 const app = express();
 
 app.use(logger("dev"));
+app.use((req, res, next) => {
+  if (req.originalUrl === "/stripe-webhook") {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
 app.post(
   "/stripe-webhook",
   express.raw({ type: "application/json" }),
   stripeWebhook
 );
-app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(cookieParser());
