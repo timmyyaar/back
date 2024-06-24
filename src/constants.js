@@ -4,6 +4,7 @@ const EMAIL_REGEX =
 const BRACKETS_REGEX = /\([^()]*\)/;
 
 const ROLES = {
+  SUPERVISOR: "supervisor",
   ADMIN: "admin",
   CLEANER: "cleaner",
   CLIENT: "client",
