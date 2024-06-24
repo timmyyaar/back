@@ -14,7 +14,9 @@ const LocalesController = () => {
   };
 
   const createNewLocale = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -26,7 +28,7 @@ const LocalesController = () => {
       if (key && english && polish && russian && ukrainian) {
         const localeExists = await pool.query(
           "SELECT * FROM locales WHERE key = $1",
-          [key]
+          [key],
         );
 
         if (localeExists.rowCount > 0) {
@@ -35,7 +37,7 @@ const LocalesController = () => {
           const result = await pool.query(
             `INSERT INTO locales (key, value, locale) VALUES ($1, $2, $6), 
              ($1, $3, $7), ($1, $4, $8), ($1, $5, $9) RETURNING *`,
-            [key, english, polish, russian, ukrainian, "en", "pl", "ru", "ua"]
+            [key, english, polish, russian, ukrainian, "en", "pl", "ru", "ua"],
           );
 
           res.status(200).json(result.rows);
@@ -49,7 +51,9 @@ const LocalesController = () => {
   };
 
   const editOldLocale = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -61,19 +65,19 @@ const LocalesController = () => {
       if (key && english && russian && polish && ukrainian) {
         const resultEnglish = await pool.query(
           "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, english, "en"]
+          [key, english, "en"],
         );
         const resultPolish = await pool.query(
           "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, polish, "pl"]
+          [key, polish, "pl"],
         );
         const resultRussian = await pool.query(
           "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, russian, "ru"]
+          [key, russian, "ru"],
         );
         const resultUkrainian = await pool.query(
           "UPDATE locales SET value = $2 WHERE key = $1 AND locale = $3 RETURNING *",
-          [key, ukrainian, "ua"]
+          [key, ukrainian, "ua"],
         );
 
         res
@@ -93,7 +97,9 @@ const LocalesController = () => {
   };
 
   const deleteLocale = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -104,7 +110,7 @@ const LocalesController = () => {
 
       const result = await pool.query(
         "DELETE FROM locales WHERE key = $1 RETURNING *",
-        [key]
+        [key],
       );
 
       res

@@ -21,7 +21,7 @@ const DocumentsController = () => {
 
         const existingDocumentQuery = await pool.query(
           "SELECT * FROM documents WHERE name = $1 AND employee_id = $2",
-          [documentName, userId]
+          [documentName, userId],
         );
         const existingDocument = existingDocumentQuery.rows[0];
 
@@ -33,7 +33,7 @@ const DocumentsController = () => {
           {
             token: env.getEnvironment("BLOB_TOKEN_DOCUMENTS"),
             access: "public",
-          }
+          },
         );
 
         if (existingDocument) {
@@ -43,7 +43,7 @@ const DocumentsController = () => {
 
           await pool.query(
             "UPDATE documents SET link = $1 WHERE name = $2 AND employee_id = $3 RETURNING *",
-            [uploadedDocument.url, documentName, userId]
+            [uploadedDocument.url, documentName, userId],
           );
         } else {
           await pool.query(
@@ -53,7 +53,7 @@ const DocumentsController = () => {
               documentName,
               userId,
               uploadedDocument.pathname,
-            ]
+            ],
           );
         }
 
@@ -70,7 +70,12 @@ const DocumentsController = () => {
 
   const deleteDocument = async (req, res) => {
     const { url, name, id } = req.body;
-    const userId = req.role !== constants.ROLES.ADMIN ? req.userId : id;
+    const userId = ![
+      constants.ROLES.ADMIN,
+      constants.ROLES.SUPERVISOR,
+    ].includes(req.role)
+      ? req.userId
+      : id;
 
     if (!url) {
       return res.status(404).json({ message: "Document not found!" });
@@ -83,7 +88,7 @@ const DocumentsController = () => {
 
       await pool.query(
         "DELETE FROM documents WHERE name = $1 AND link = $2 AND employee_id = $3 RETURNING *",
-        [name, url, userId]
+        [name, url, userId],
       );
 
       return res.status(200).json({ message: "Document was deleted" });
@@ -93,13 +98,17 @@ const DocumentsController = () => {
   };
 
   const getDocuments = async (req, res) => {
-    const userId =
-      req.role !== constants.ROLES.ADMIN ? req.userId : req.params.id;
+    const userId = ![
+      constants.ROLES.ADMIN,
+      constants.ROLES.SUPERVISOR,
+    ].includes(req.role)
+      ? req.userId
+      : req.params.id;
 
     try {
       const result = await pool.query(
         "SELECT * FROM documents WHERE employee_id = $1",
-        [userId]
+        [userId],
       );
 
       return res.json(result.rows);

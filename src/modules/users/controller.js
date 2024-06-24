@@ -21,7 +21,7 @@ const getUserWithRating = (user) => {
       ? Number(
           (
             rating.reduce((result, item) => result + +item, 0) / rating.length
-          ).toFixed(1)
+          ).toFixed(1),
         )
       : 5,
   };
@@ -39,7 +39,7 @@ const UsersController = () => {
 
       const userQuery = await pool.query(
         "SELECT * FROM users WHERE email = $1",
-        [email]
+        [email],
       );
       const existingUser = userQuery.rows[0];
 
@@ -49,7 +49,7 @@ const UsersController = () => {
 
       const result = await pool.query(
         "INSERT INTO users(email, password, role) VALUES($1, $2, $3) RETURNING *",
-        [data.email, data.password, "admin"]
+        [data.email, data.password, "admin"],
       );
 
       if (result.rows[0]) {
@@ -68,14 +68,14 @@ const UsersController = () => {
 
       const userQuery = await pool.query(
         "SELECT * FROM users WHERE email = $1",
-        [email]
+        [email],
       );
       const existingUser = userQuery.rows[0];
 
       if (existingUser) {
         const isPasswordCorrect = await bcrypt.compare(
           password,
-          existingUser.password
+          existingUser.password,
         );
 
         if (isPasswordCorrect) {
@@ -84,7 +84,7 @@ const UsersController = () => {
             env.getEnvironment("SECRET_WORD"),
             {
               expiresIn: AUTH_COOKIE_EXPIRATION_TIME,
-            }
+            },
           );
 
           res.cookie("authToken", token, {
@@ -116,7 +116,9 @@ const UsersController = () => {
   };
 
   const getUsers = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -146,6 +148,7 @@ const UsersController = () => {
         firstName: user.first_name,
         lastName: user.last_name,
         customerId: user.customer_id,
+        cities: user.cities,
       });
     } catch (error) {
       res.status(500).json({ error });
@@ -153,7 +156,9 @@ const UsersController = () => {
   };
 
   const createUser = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -168,6 +173,7 @@ const UsersController = () => {
         haveCar = false,
         firstName = "",
         lastName = "",
+        cities = [],
       } = req.body;
 
       if (!email || !password || !role || !firstName || !lastName) {
@@ -178,7 +184,7 @@ const UsersController = () => {
 
       const userQuery = await pool.query(
         "SELECT * FROM users WHERE email = $1",
-        [email]
+        [email],
       );
       const existingUser = userQuery.rows[0];
 
@@ -199,7 +205,7 @@ const UsersController = () => {
 
       const result = await pool.query(
         `INSERT INTO users(email, password, role, have_vacuum_cleaner,
-         have_car, first_name, last_name, customer_id) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+         have_car, first_name, last_name, customer_id, cities) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
         [
           email,
           hashedPassword,
@@ -209,7 +215,8 @@ const UsersController = () => {
           firstName,
           lastName,
           customer.id,
-        ]
+          cities.join(","),
+        ],
       );
 
       res.status(200).json(getUserWithRating(result.rows[0]));
@@ -219,21 +226,31 @@ const UsersController = () => {
   };
 
   const updateUser = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
     }
 
     try {
-      const { role, haveVacuumCleaner, haveCar, firstName, lastName } =
+      const { role, haveVacuumCleaner, haveCar, firstName, lastName, cities } =
         req.body;
       const id = req.params.id;
 
       const result = await pool.query(
         `UPDATE users SET role = $2, have_vacuum_cleaner = $3, have_car = $4,
-           first_name = $5, last_name = $6 WHERE id = $1 RETURNING *`,
-        [id, role, haveVacuumCleaner, haveCar, firstName, lastName]
+           first_name = $5, last_name = $6, cities = $7 WHERE id = $1 RETURNING *`,
+        [
+          id,
+          role,
+          haveVacuumCleaner,
+          haveCar,
+          firstName,
+          lastName,
+          cities.join(","),
+        ],
       );
 
       return res.status(200).json(getUserWithRating(result.rows[0]));
@@ -243,7 +260,9 @@ const UsersController = () => {
   };
 
   const changePassword = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -257,7 +276,7 @@ const UsersController = () => {
 
       const result = await pool.query(
         "UPDATE users SET password = $2 WHERE id = $1 RETURNING *",
-        [id, hashedPassword]
+        [id, hashedPassword],
       );
 
       res.status(200).json(getUserWithRating(result.rows[0]));
@@ -267,7 +286,9 @@ const UsersController = () => {
   };
 
   const deleteUser = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -278,7 +299,7 @@ const UsersController = () => {
 
       const result = await pool.query(
         "DELETE FROM users WHERE id = $1 RETURNING *",
-        [id]
+        [id],
       );
 
       res.status(200).json(getUserWithRating(result.rows[0]));
@@ -288,7 +309,9 @@ const UsersController = () => {
   };
 
   const updateUserRating = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -307,7 +330,7 @@ const UsersController = () => {
 
       const result = await pool.query(
         "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
-        [id, updatedRating]
+        [id, updatedRating],
       );
 
       res.status(200).json(getUserWithRating(result.rows[0]));

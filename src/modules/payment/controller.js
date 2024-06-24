@@ -57,7 +57,10 @@ const PaymentController = () => {
   };
 
   const capturePayment = async (req, res) => {
-    const isAdmin = req.role === constants.ROLES.ADMIN;
+    const isAdmin = [
+      constants.ROLES.ADMIN,
+      constants.ROLES.SUPERVISOR,
+    ].includes(req.role);
     const { id } = req.params;
 
     if (!isAdmin) {

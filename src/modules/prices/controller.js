@@ -14,7 +14,10 @@ const PricesController = () => {
   };
 
   const updatePrice = async (req, res) => {
-    const isAdmin = req.role === constants.ROLES.ADMIN;
+    const isAdmin = [
+      constants.ROLES.ADMIN,
+      constants.ROLES.SUPERVISOR,
+    ].includes(req.role);
 
     if (!isAdmin) {
       return res
@@ -26,7 +29,7 @@ const PricesController = () => {
 
     if (
       prices.some(
-        ({ price }) => (!price && price !== 0) || typeof price !== "number"
+        ({ price }) => (!price && price !== 0) || typeof price !== "number",
       )
     ) {
       return res.status(400).json({ message: "Incorrect price!" });
@@ -39,8 +42,8 @@ const PricesController = () => {
             await pool.query("UPDATE prices SET price = $2 WHERE key = $1", [
               key,
               price,
-            ])
-        )
+            ]),
+        ),
       );
 
       return res.json({ message: "Prices have been updated!" });
