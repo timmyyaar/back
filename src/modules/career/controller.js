@@ -9,18 +9,20 @@ const CREATED_ORDERS_CHANNEL_ID = "-1002017671793";
 const sendTelegramMessage = async () => {
   await fetch(
     `https://api.telegram.org/bot${env.getEnvironment(
-      "TELEGRAM_BOT_ID"
+      "TELEGRAM_BOT_ID",
     )}/sendMessage?` +
       new URLSearchParams({
         chat_id: CREATED_ORDERS_CHANNEL_ID,
         text: "New career application!",
-      })
+      }),
   );
 };
 
 const CareersController = () => {
   const getCareers = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -42,7 +44,7 @@ const CareersController = () => {
       if (name && phone && email) {
         const result = await pool.query(
           "INSERT INTO careers(name, phone, email, about, referral_code) VALUES($1, $2, $3, $4, $5) RETURNING *",
-          [name, phone, email, about, referralCode]
+          [name, phone, email, about, referralCode],
         );
 
         if (env.getEnvironment("MODE") === "prod") {
@@ -59,7 +61,9 @@ const CareersController = () => {
   };
 
   const deleteCareers = async (req, res) => {
-    if (req.role !== constants.ROLES.ADMIN) {
+    if (
+      ![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(req.role)
+    ) {
       return res
         .status(403)
         .json({ message: "You don't have access to this!" });
@@ -70,7 +74,7 @@ const CareersController = () => {
 
       const result = await pool.query(
         "DELETE FROM careers WHERE id = $1 RETURNING *",
-        [id]
+        [id],
       );
 
       return res

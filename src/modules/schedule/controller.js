@@ -25,7 +25,7 @@ const ScheduleController = () => {
     const id = req.params.id || req.userId;
 
     try {
-      const isAdmin = req.role === ROLES.ADMIN;
+      const isAdmin = [ROLES.ADMIN, ROLES.SUPERVISOR].includes(req.role);
 
       const clients =
         isAdmin && !req.params.id
@@ -74,7 +74,7 @@ const ScheduleController = () => {
           secondPeriodAdditional,
           thirdPeriodAdditional,
           fourthPeriodAdditional,
-        ]
+        ],
       );
 
       res
@@ -117,7 +117,7 @@ const ScheduleController = () => {
           secondPeriodAdditional,
           thirdPeriodAdditional,
           fourthPeriodAdditional,
-        ]
+        ],
       );
 
       res

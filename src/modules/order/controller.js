@@ -17,6 +17,7 @@ const {
   ROLES,
   PAYMENT_STATUS,
   STRIPE_PAYMENT_STATUS,
+  CITIES,
 } = require("../../constants");
 
 const { getCleanerReward } = require("./price-utils");
@@ -47,7 +48,12 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const { CREATED_ORDERS_CHANNEL_ID, ORDER_STATUS } = require("./constants");
+const {
+  CREATED_ORDERS_CHANNEL_ID,
+  WARSAW_CREATED_ORDERS_CHANNEL_ID,
+  ORDER_STATUS,
+  ORDER_TITLES,
+} = require("./constants");
 
 const OrderController = () => {
   const reScheduleReminders = async () => {
@@ -81,7 +87,7 @@ const OrderController = () => {
     try {
       const result = await pool.query(
         'SELECT * FROM "order" WHERE id = ANY($1::int[])',
-        [idsArray]
+        [idsArray],
       );
 
       return res.json(getOrdersWithCleaners(result.rows));
@@ -103,7 +109,7 @@ const OrderController = () => {
 
       const { rows: clientOrders } = await pool.query(
         'SELECT * FROM "order" WHERE name = $1 AND number = $2',
-        [clientName, clientPhone]
+        [clientName, clientPhone],
       );
 
       return res.status(200).json(getOrdersWithCleaners(clientOrders));
@@ -138,6 +144,7 @@ const OrderController = () => {
         priceOriginal,
         additionalInformation,
         city,
+        mainCity,
         transportationPrice,
         mainServiceEstimate,
         mainServiceCleanersCount,
@@ -155,7 +162,7 @@ const OrderController = () => {
         if (promo) {
           const isPromoUsed = await pool.query(
             'SELECT * FROM "order" WHERE (promo = $1) AND (address = $2 OR number = $3)',
-            [promo, address, number]
+            [promo, address, number],
           );
 
           if (isPromoUsed.rows[0]) {
@@ -164,7 +171,7 @@ const OrderController = () => {
 
           const existingPromoQuery = await pool.query(
             "SELECT * FROM promo WHERE code = $1",
-            [promo]
+            [promo],
           );
           const existingPromo = existingPromoQuery.rows[0];
 
@@ -183,7 +190,7 @@ const OrderController = () => {
 
         const isClientExists = await pool.query(
           "SELECT * FROM clients WHERE (phone = $1 AND name = $2)",
-          [number, name]
+          [number, name],
         );
         const isNewClient = isClientExists.rowCount === 0;
 
@@ -191,9 +198,14 @@ const OrderController = () => {
           await pool.query(
             `INSERT INTO clients (name, phone, email, address, first_order_creation_date, first_order_date)
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [name, number, email, address, creationDate, date]
+            [name, number, email, address, creationDate, date],
           );
         }
+
+        const createdOrdersChannelId =
+          mainCity === CITIES.WARSAW
+            ? WARSAW_CREATED_ORDERS_CHANNEL_ID
+            : CREATED_ORDERS_CHANNEL_ID;
 
         if (secTitle) {
           const result = await pool.query(
@@ -204,10 +216,10 @@ const OrderController = () => {
               price_original, total_service_price_original, additional_information, 
               is_new_client, city, transportation_price, cleaners_count, language, 
               creation_date, own_check_list, reward_original, payment_status, payment_intent,
-              manual_cleaners_count, status) 
+              manual_cleaners_count, status, main_city) 
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36, $37, $39), ($1, $2, $3, $4, $5, $6, $7, $8, $9, $28, $15, 
-              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36, $38, $39) RETURNING *`,
+              $12, $13, $14, $19, $20, $22, $23, $24, $25, $26, $27, $30, $31, $32, $33, $35, $36, $37, $39, $40), ($1, $2, $3, $4, $5, $41, $7, $8, $9, $28, $15, 
+              $16, $17, $18, $19, $21, $22, $23, $24, $25, $26, $29, $30, $31, $32, $34, $35, $36, $38, $39, $40) RETURNING *`,
             [
               name,
               number,
@@ -260,16 +272,14 @@ const OrderController = () => {
               mainServiceManualCleanersCount,
               secondServiceManualCleanersCount,
               ORDER_STATUS.CREATED,
-            ]
+              mainCity,
+              onlinePayment || secTitle === ORDER_TITLES.DRY_CLEANING,
+            ],
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
-            await sendTelegramMessage(
-              date,
-              CREATED_ORDERS_CHANNEL_ID,
-              secTitle
-            );
+            await sendTelegramMessage(date, createdOrdersChannelId, title);
+            await sendTelegramMessage(date, createdOrdersChannelId, secTitle);
           }
 
           return res
@@ -284,9 +294,9 @@ const OrderController = () => {
              price_original, total_service_price_original, additional_information, 
              is_new_client, city, transportation_price, cleaners_count, language, 
              creation_date, own_check_list, reward_original, payment_status, payment_intent,
-             manual_cleaners_count, status) 
+             manual_cleaners_count, status, main_city) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30) RETURNING *`,
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31) RETURNING *`,
             [
               name,
               number,
@@ -324,11 +334,12 @@ const OrderController = () => {
               paymentIntentId,
               mainServiceManualCleanersCount,
               ORDER_STATUS.CREATED,
-            ]
+              mainCity,
+            ],
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
+            await sendTelegramMessage(date, createdOrdersChannelId, title);
           }
 
           const createdOrder = result.rows[0];
@@ -352,7 +363,7 @@ const OrderController = () => {
 
       const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
-        [id]
+        [id],
       );
       const existingOrder = existingOrderQuery.rows[0];
 
@@ -379,7 +390,7 @@ const OrderController = () => {
           existingOrder.address,
           existingOrder.name,
           existingOrder.creation_date,
-        ]
+        ],
       );
 
       await pool.query('DELETE FROM "order" WHERE id = $1 RETURNING *', [id]);
@@ -409,7 +420,7 @@ const OrderController = () => {
 
       const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
-        [id]
+        [id],
       );
       const existingOrder = existingOrderQuery.rows[0];
 
@@ -427,8 +438,8 @@ const OrderController = () => {
       const updatedCheckList = isDryCleaningOrOzonation
         ? null
         : isApprovedStatus && !existingOrder.is_confirmed
-        ? JSON.stringify(getOrderCheckList(existingOrder))
-        : existingOrder.check_list;
+          ? JSON.stringify(getOrderCheckList(existingOrder))
+          : existingOrder.check_list;
 
       const result = await pool.query(
         `UPDATE "order" SET cleaner_id = $2, status = $3, check_list = $4,
@@ -439,7 +450,7 @@ const OrderController = () => {
           isApprovedStatus ? "approved" : "created",
           updatedCheckList,
           isApprovedStatus ? true : existingOrder.is_confirmed,
-        ]
+        ],
       );
 
       await updateScheduleForMultipleCleaners(existingOrder, cleanerId);
@@ -453,7 +464,7 @@ const OrderController = () => {
           existingOrder,
           updatedCheckList,
           locales,
-          transporter
+          transporter,
         );
       }
 
@@ -487,13 +498,13 @@ const OrderController = () => {
 
       const cleanersQuery = await pool.query(
         "SELECT * FROM users WHERE id = ANY($1::int[])",
-        [existingCleanerId]
+        [existingCleanerId],
       );
       const assignedCleaners = cleanersQuery.rows;
 
       const currentCleanerQuery = await pool.query(
         "SELECT * FROM users WHERE id = $1",
-        [cleanerId]
+        [cleanerId],
       );
       const currentCleaner = currentCleanerQuery.rows[0];
 
@@ -501,7 +512,7 @@ const OrderController = () => {
         existingOrder.subservice.includes(VACUUM_CLEANER_SUB_SERVICE) &&
         existingOrder.cleaners_count - existingCleanerId.length === 1 &&
         !assignedCleaners.some(
-          ({ have_vacuum_cleaner }) => have_vacuum_cleaner
+          ({ have_vacuum_cleaner }) => have_vacuum_cleaner,
         ) &&
         !currentCleaner.have_vacuum_cleaner
       ) {
@@ -524,7 +535,7 @@ const OrderController = () => {
 
       const result = await pool.query(
         'UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *',
-        [id, [...existingCleanerId, cleanerId].join(",")]
+        [id, [...existingCleanerId, cleanerId].join(",")],
       );
       const updatedOrder = result.rows[0];
 
@@ -541,7 +552,7 @@ const OrderController = () => {
       const id = req.params.id;
       const status = req.params.status;
 
-      const isAdmin = req.role === ROLES.ADMIN;
+      const isAdmin = [ROLES.ADMIN, ROLES.SUPERVISOR].includes(req.role);
 
       if (status === ORDER_STATUS.APPROVED && !isAdmin) {
         return res
@@ -553,7 +564,7 @@ const OrderController = () => {
 
       const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
-        [id]
+        [id],
       );
       const existingOrder = existingOrderQuery.rows[0];
 
@@ -565,7 +576,7 @@ const OrderController = () => {
         rows: [connectedOrder],
       } = await pool.query(
         'SELECT * FROM "order" WHERE (id != $1) AND (date = $2 and number = $3 and address = $4)',
-        [id, existingOrder.date, existingOrder.number, existingOrder.address]
+        [id, existingOrder.date, existingOrder.number, existingOrder.address],
       );
 
       const feedBackLinkId = connectedOrder
@@ -575,7 +586,7 @@ const OrderController = () => {
           ]
         : [{ id: existingOrder.id, title: existingOrder.title }];
       const base64Orders = Buffer.from(JSON.stringify(feedBackLinkId)).toString(
-        "base64"
+        "base64",
       );
 
       const isDryCleaningOrOzonation = [
@@ -586,10 +597,10 @@ const OrderController = () => {
       const updatedCheckList = isDryCleaningOrOzonation
         ? null
         : status === ORDER_STATUS.DONE && checkList
-        ? JSON.stringify(checkList)
-        : status === ORDER_STATUS.APPROVED && !existingOrder.is_confirmed
-        ? JSON.stringify(getOrderCheckList(existingOrder))
-        : existingOrder.check_list;
+          ? JSON.stringify(checkList)
+          : status === ORDER_STATUS.APPROVED && !existingOrder.is_confirmed
+            ? JSON.stringify(getOrderCheckList(existingOrder))
+            : existingOrder.check_list;
 
       const needToCancelPayment =
         existingOrder.payment_intent &&
@@ -617,7 +628,7 @@ const OrderController = () => {
           needToCancelPayment
             ? PAYMENT_STATUS.CANCELED
             : existingOrder.payment_status,
-        ]
+        ],
       );
 
       const getUpdatedConnectedOrder = async () => {
@@ -642,7 +653,7 @@ const OrderController = () => {
             updatedConnectedOrderFeedbackLink,
             updatedConnectedOrderStatus,
             updatedConnectedOrderPaymentStatus,
-          ]
+          ],
         );
 
         return updatedConnectedOrder;
@@ -658,7 +669,7 @@ const OrderController = () => {
           updatedCheckList,
           locales,
           transporter,
-          true
+          true,
         );
       }
 
@@ -666,7 +677,7 @@ const OrderController = () => {
         await sendFeedbackEmailAndSetReminder(
           updatedOrder,
           connectedOrder,
-          transporter
+          transporter,
         );
       }
 
@@ -725,7 +736,7 @@ const OrderController = () => {
           existingOrder.address,
           existingOrder.name,
           existingOrder.creation_date,
-        ]
+        ],
       );
 
       const wasOnlinePaymentChanged =
@@ -783,7 +794,7 @@ const OrderController = () => {
           wasOnlinePaymentChanged ? null : existingOrder.payment_status,
           cleanersCount,
           aggregator,
-        ]
+        ],
       );
 
       const updatedOrdersResult = [{ ...updatedOrder }];
@@ -804,7 +815,7 @@ const OrderController = () => {
             onlinePayment,
             wasOnlinePaymentChanged ? null : existingOrder.payment_intent,
             wasOnlinePaymentChanged ? null : existingOrder.payment_status,
-          ]
+          ],
         );
 
         updatedOrdersResult.push({ ...updatedConnectedOrder });
@@ -823,13 +834,13 @@ const OrderController = () => {
 
       const existingOrder = await pool.query(
         `SELECT * FROM "order" WHERE id = $1`,
-        [id]
+        [id],
       );
 
       if (!existingOrder.rows[0].feedback) {
         const orderQuery = await pool.query(
           `UPDATE "order" SET feedback = $2, rating = $3 WHERE id = $1 RETURNING *`,
-          [id, feedback, rating]
+          [id, feedback, rating],
         );
 
         const updatedOrder = orderQuery.rows[0];
@@ -842,7 +853,7 @@ const OrderController = () => {
           cleanerIds.map(async (id) => {
             const userQuery = await pool.query(
               "SELECT * FROM users WHERE id = $1",
-              [id]
+              [id],
             );
             const user = userQuery.rows[0];
 
@@ -850,17 +861,17 @@ const OrderController = () => {
               const currentUserRating = user.rating || "";
               const updatedRating = getUpdatedUserRating(
                 currentUserRating,
-                rating
+                rating,
               );
 
               return await pool.query(
                 "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
-                [id, updatedRating]
+                [id, updatedRating],
               );
             } else {
               return await Promise.resolve();
             }
-          })
+          }),
         );
 
         res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
@@ -879,7 +890,7 @@ const OrderController = () => {
 
       const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
-        [id]
+        [id],
       );
       const existingOrder = existingOrderQuery.rows[0];
 
@@ -894,7 +905,7 @@ const OrderController = () => {
 
       const result = await pool.query(
         `UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *`,
-        [id, updatedCleanerIds]
+        [id, updatedCleanerIds],
       );
 
       const updatedOrder = result.rows[0];
@@ -914,7 +925,7 @@ const OrderController = () => {
 
       const result = await pool.query(
         `UPDATE "order" SET extra_expenses = $2 WHERE id = $1 RETURNING *`,
-        [id, extraExpenses]
+        [id, extraExpenses],
       );
 
       const updatedOrder = result.rows[0];
@@ -956,7 +967,7 @@ const OrderController = () => {
             existingOrder.address,
             existingOrder.name,
             existingOrder.creation_date,
-          ]
+          ],
         );
 
         const orderIds = connectedOrder
@@ -982,7 +993,7 @@ const OrderController = () => {
           rows: [updatedOrder],
         } = await pool.query(
           `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
-          [id, paymentIntent.id, PAYMENT_STATUS.PENDING]
+          [id, paymentIntent.id, PAYMENT_STATUS.PENDING],
         );
 
         const updatedOrdersResult = [{ ...updatedOrder }];
@@ -992,7 +1003,7 @@ const OrderController = () => {
             rows: [updatedConnectedOrder],
           } = await pool.query(
             `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
-            [connectedOrder.id, paymentIntent.id, PAYMENT_STATUS.PENDING]
+            [connectedOrder.id, paymentIntent.id, PAYMENT_STATUS.PENDING],
           );
 
           updatedOrdersResult.push({ ...updatedConnectedOrder });
@@ -1022,7 +1033,7 @@ const OrderController = () => {
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(
-        existingOrder.payment_intent
+        existingOrder.payment_intent,
       );
 
       const needToSyncStatuses =
@@ -1034,7 +1045,7 @@ const OrderController = () => {
           rows: [updatedOrder],
         } = await pool.query(
           `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
-          [id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION]
+          [id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION],
         );
 
         const updatedOrdersResult = [{ ...updatedOrder }];
@@ -1051,7 +1062,7 @@ const OrderController = () => {
             existingOrder.address,
             existingOrder.name,
             existingOrder.creation_date,
-          ]
+          ],
         );
 
         if (connectedOrder) {
@@ -1059,7 +1070,7 @@ const OrderController = () => {
             rows: [updatedConnectedOrder],
           } = await pool.query(
             `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
-            [connectedOrder.id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION]
+            [connectedOrder.id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION],
           );
 
           updatedOrdersResult.push({ ...updatedConnectedOrder });
@@ -1101,7 +1112,7 @@ const OrderController = () => {
         existingOrder.address,
         existingOrder.name,
         existingOrder.creation_date,
-      ]
+      ],
     );
 
     try {
@@ -1114,7 +1125,7 @@ const OrderController = () => {
           rows: [updatedOrder],
         } = await pool.query(
           'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-          [existingOrder.id, PAYMENT_STATUS.CONFIRMED]
+          [existingOrder.id, PAYMENT_STATUS.CONFIRMED],
         );
 
         const updatedOrdersResult = [updatedOrder];
@@ -1124,7 +1135,7 @@ const OrderController = () => {
             rows: [approvedConnectedOrder],
           } = await pool.query(
             'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
+            [connectedOrder.id, PAYMENT_STATUS.CONFIRMED],
           );
 
           updatedOrdersResult.push(approvedConnectedOrder);
@@ -1168,14 +1179,14 @@ const OrderController = () => {
           existingOrder.address,
           existingOrder.name,
           existingOrder.creation_date,
-        ]
+        ],
       );
 
       const {
         rows: [updatedOrder],
       } = await pool.query(
         `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
-        [id, PAYMENT_STATUS.CONFIRMED]
+        [id, PAYMENT_STATUS.CONFIRMED],
       );
 
       const updatedOrdersResult = [updatedOrder];
@@ -1185,7 +1196,7 @@ const OrderController = () => {
           rows: [approvedConnectedOrder],
         } = await pool.query(
           'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
-          [connectedOrder.id, PAYMENT_STATUS.CONFIRMED]
+          [connectedOrder.id, PAYMENT_STATUS.CONFIRMED],
         );
 
         updatedOrdersResult.push(approvedConnectedOrder);

@@ -4,6 +4,7 @@ const EMAIL_REGEX =
 const BRACKETS_REGEX = /\([^()]*\)/;
 
 const ROLES = {
+  SUPERVISOR: "supervisor",
   ADMIN: "admin",
   CLEANER: "cleaner",
   CLIENT: "client",
@@ -39,6 +40,8 @@ const STRIPE_PAYMENT_STATUS = {
   REQUIRES_CAPTURE: "requires_capture",
 };
 
+const CITIES = { WARSAW: "Warsaw", KRAKOW: "Krakow" };
+
 module.exports = {
   EMAIL_REGEX,
   BRACKETS_REGEX,
@@ -46,4 +49,5 @@ module.exports = {
   ORDER_TYPES,
   PAYMENT_STATUS,
   STRIPE_PAYMENT_STATUS,
+  CITIES,
 };
