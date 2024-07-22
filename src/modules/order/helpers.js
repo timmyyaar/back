@@ -11,6 +11,7 @@ const {
   emailSubjectTranslation,
   APPROVED_DRY_OZONATION_CHANNEL_ID,
   APPROVED_REGULAR_CHANNEL_ID,
+  WARSAW_APPROVED_ORDERS_CHANNEL_ID,
   getReminderEmailSubjectTranslation,
 } = require("./constants");
 const {
@@ -24,13 +25,15 @@ const {
   getUpdatedScheduleDetailsForEdit,
   getUpdatedScheduleDetailsForDelete,
 } = require("./utils");
+const { CITIES } = require("../../constants");
 
 const sendConfirmationEmailAndTelegramMessage = async (
   order,
   updatedCheckList,
   locales,
   transporter,
-  needToSendTelegramMessage
+  needToSendTelegramMessage,
+  mainCity,
 ) => {
   const isDryOrOzonation = [
     ORDER_TITLES.DRY_CLEANING,
@@ -45,7 +48,7 @@ const sendConfirmationEmailAndTelegramMessage = async (
           ...result,
           [key]: value,
         }),
-        {}
+        {},
       );
 
     await transporter.sendMail({
@@ -55,7 +58,7 @@ const sendConfirmationEmailAndTelegramMessage = async (
       html: getConfirmationEmailHtmlTemplate(
         order,
         currentLanguageLocales,
-        updatedCheckList
+        updatedCheckList,
       ),
       attachments: [
         {
@@ -73,13 +76,14 @@ const sendConfirmationEmailAndTelegramMessage = async (
   }
 
   if (env.getEnvironment("MODE") === "prod" && needToSendTelegramMessage) {
-    await sendTelegramMessage(
-      order.date,
-      isDryOrOzonation
-        ? APPROVED_DRY_OZONATION_CHANNEL_ID
-        : APPROVED_REGULAR_CHANNEL_ID,
-      order.title
-    );
+    const approvedChannelId =
+      mainCity === CITIES.WARSAW
+        ? WARSAW_APPROVED_ORDERS_CHANNEL_ID
+        : isDryOrOzonation
+          ? APPROVED_DRY_OZONATION_CHANNEL_ID
+          : APPROVED_REGULAR_CHANNEL_ID;
+
+    await sendTelegramMessage(order.date, approvedChannelId, order.title);
   }
 };
 
@@ -119,7 +123,7 @@ const scheduleReminder = (date, order, transporter) => {
 const sendFeedbackEmailAndSetReminder = async (
   updatedOrder,
   connectedOrder,
-  transporter
+  transporter,
 ) => {
   const sendFeedbackLink =
     updatedOrder.feedback_link_id &&
@@ -148,11 +152,11 @@ const sendFeedbackEmailAndSetReminder = async (
 
   const existingReminderQuery = await pool.query(
     "SELECT * FROM reminders WHERE email = $1",
-    [updatedOrder.email]
+    [updatedOrder.email],
   );
   const existingReminder = existingReminderQuery.rows[0];
   const nextReminderDate = new Date(
-    new Date().setMinutes(new Date().getMinutes() - 1)
+    new Date().setMinutes(new Date().getMinutes() - 1),
   );
   const dateInMonth = getDateTimeString(nextReminderDate);
 
@@ -169,7 +173,7 @@ const sendFeedbackEmailAndSetReminder = async (
         dateInMonth,
         updatedOrder.language,
         updatedOrder.name,
-      ]
+      ],
     );
   }
 
@@ -184,7 +188,7 @@ const addOrderToSchedule = async (existingOrder, cleanerId) => {
 
   const existingScheduleQuery = await pool.query(
     "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-    [cleanerId, orderDate]
+    [cleanerId, orderDate],
   );
   const existingSchedule = existingScheduleQuery.rows[0];
 
@@ -200,7 +204,7 @@ const addOrderToSchedule = async (existingOrder, cleanerId) => {
         existingSchedule.id,
         existingSchedule.date,
         ...getUpdatedScheduleDetailsForEdit(existingSchedule, scheduleParts),
-      ]
+      ],
     );
   } else {
     await pool.query(
@@ -224,7 +228,7 @@ const addOrderToSchedule = async (existingOrder, cleanerId) => {
         !scheduleParts.secondPeriod,
         !scheduleParts.thirdPeriod,
         !scheduleParts.fourthPeriod,
-      ]
+      ],
     );
   }
 };
@@ -237,7 +241,7 @@ const removeOrderFromSchedule = async (existingOrder, userId) => {
 
   const existingScheduleQuery = await pool.query(
     "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-    [+userId, orderDate]
+    [+userId, orderDate],
   );
   const existingSchedule = existingScheduleQuery.rows[0];
 
@@ -253,7 +257,7 @@ const removeOrderFromSchedule = async (existingOrder, userId) => {
         existingSchedule.id,
         existingSchedule.date,
         ...getUpdatedScheduleDetailsForDelete(existingSchedule, scheduleParts),
-      ]
+      ],
     );
   }
 };
@@ -269,7 +273,7 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
     const cleanersDifference = cleanerId
       .filter((cleaner) => !existingOrderCleaners.includes(cleaner))
       .concat(
-        existingOrderCleaners.filter((cleaner) => !cleanerId.includes(cleaner))
+        existingOrderCleaners.filter((cleaner) => !cleanerId.includes(cleaner)),
       );
 
     if (cleanersDifferenceLength > 0) {
@@ -282,7 +286,7 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
 
           const existingScheduleQuery = await pool.query(
             "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-            [cleaner, orderDate]
+            [cleaner, orderDate],
           );
           const existingSchedule = existingScheduleQuery.rows[0];
 
@@ -299,9 +303,9 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
                 existingSchedule.date,
                 ...getUpdatedScheduleDetailsForEdit(
                   existingSchedule,
-                  scheduleParts
+                  scheduleParts,
                 ),
-              ]
+              ],
             );
           } else {
             await pool.query(
@@ -325,10 +329,10 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
                 !scheduleParts.secondPeriod,
                 !scheduleParts.thirdPeriod,
                 !scheduleParts.fourthPeriod,
-              ]
+              ],
             );
           }
-        })
+        }),
       );
     } else {
       await Promise.all(
@@ -340,7 +344,7 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
 
           const existingScheduleQuery = await pool.query(
             "SELECT * FROM schedule WHERE employee_id = $1 AND date = $2",
-            [cleaner, orderDate]
+            [cleaner, orderDate],
           );
           const existingSchedule = existingScheduleQuery.rows[0];
 
@@ -357,12 +361,12 @@ const updateScheduleForMultipleCleaners = async (existingOrder, cleanerId) => {
                 existingSchedule.date,
                 ...getUpdatedScheduleDetailsForDelete(
                   existingSchedule,
-                  scheduleParts
+                  scheduleParts,
                 ),
-              ]
+              ],
             );
           }
-        })
+        }),
       );
     }
   }
