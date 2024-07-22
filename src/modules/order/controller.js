@@ -17,6 +17,7 @@ const {
   ROLES,
   PAYMENT_STATUS,
   STRIPE_PAYMENT_STATUS,
+  CITIES,
 } = require("../../constants");
 
 const { getCleanerReward } = require("./price-utils");
@@ -49,6 +50,7 @@ const transporter = nodemailer.createTransport({
 
 const {
   CREATED_ORDERS_CHANNEL_ID,
+  WARSAW_CREATED_ORDERS_CHANNEL_ID,
   ORDER_STATUS,
   ORDER_TITLES,
 } = require("./constants");
@@ -200,6 +202,11 @@ const OrderController = () => {
           );
         }
 
+        const createdOrdersChannelId =
+          mainCity === CITIES.WARSAW
+            ? WARSAW_CREATED_ORDERS_CHANNEL_ID
+            : CREATED_ORDERS_CHANNEL_ID;
+
         if (secTitle) {
           const result = await pool.query(
             `INSERT INTO "order" 
@@ -271,12 +278,8 @@ const OrderController = () => {
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
-            await sendTelegramMessage(
-              date,
-              CREATED_ORDERS_CHANNEL_ID,
-              secTitle,
-            );
+            await sendTelegramMessage(date, createdOrdersChannelId, title);
+            await sendTelegramMessage(date, createdOrdersChannelId, secTitle);
           }
 
           return res
@@ -336,7 +339,7 @@ const OrderController = () => {
           );
 
           if (env.getEnvironment("MODE") === "prod") {
-            await sendTelegramMessage(date, CREATED_ORDERS_CHANNEL_ID, title);
+            await sendTelegramMessage(date, createdOrdersChannelId, title);
           }
 
           const createdOrder = result.rows[0];

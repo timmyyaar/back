@@ -14,6 +14,8 @@ const ORDER_STATUS = {
 const CREATED_ORDERS_CHANNEL_ID = "-1002017671793";
 const APPROVED_DRY_OZONATION_CHANNEL_ID = "-1002083170852";
 const APPROVED_REGULAR_CHANNEL_ID = "-1002083336889";
+const WARSAW_CREATED_ORDERS_CHANNEL_ID = "-1002231245144";
+const WARSAW_APPROVED_ORDERS_CHANNEL_ID = "-1002228161529";
 
 const emailSubjectTranslation = {
   en: "Take Your Time, help us grow with a review",
@@ -51,7 +53,7 @@ const emailTranslations = {
     warm_regards: "Warm regards, Take Your Time",
     cleaning_scheduled: (
       date,
-      showCheckList
+      showCheckList,
     ) => `We have great news - we have successfully scheduled the cleaning of your space for <b>${date}</b>. We are ready to provide you with our professional services to ensure freshness and cleanliness to your home or office. <br />
 ${
   showCheckList
@@ -83,7 +85,7 @@ We are confident that you will be pleased with our work. Our team is ready to go
     warm_regards: "Z serdecznymi pozdrowieniami, Take Your Time",
     cleaning_scheduled: (
       date,
-      showCheckList
+      showCheckList,
     ) => `Mamy świetną wiadomość - właśnie przypisaliśmy sprzątanie Państwa przestrzeni na <b>${date}</b>. Jesteśmy gotowi zapewnić Państwa domowi lub biuru świeżość i czystość dzięki naszym profesjonalnym usługom. <br />
 ${
   showCheckList
@@ -116,7 +118,7 @@ Jesteśmy pewni, że będą Państwo zadowoleni z naszej pracy. Nasz zespół je
     warm_regards: "С наилучшими пожеланиями, Take Your Time",
     cleaning_scheduled: (
       date,
-      showCheckList
+      showCheckList,
     ) => `Хотим сообщить вам отличную новость - мы успешно назначили уборку вашего пространства на <b>${date}</b>. Мы готовы предоставить вам наши профессиональные услуги, чтобы обеспечить вашему дому или офису свежесть и чистоту. <br />
 ${
   showCheckList
@@ -149,7 +151,7 @@ ${
     warm_regards: "З найкращими побажаннями, Take Your Time",
     cleaning_scheduled: (
       date,
-      showCheckList
+      showCheckList,
     ) => `Ми маємо чудову новину - ми успішно призначили прибирання вашого простору на <b>${date}</b>. Ми готові надати вам наші професійні послуги, щоб забезпечити вашому будинку або офісу свіжість і чистоту. <br />
 ${
   showCheckList
@@ -175,6 +177,8 @@ module.exports = {
   CREATED_ORDERS_CHANNEL_ID,
   APPROVED_REGULAR_CHANNEL_ID,
   APPROVED_DRY_OZONATION_CHANNEL_ID,
+  WARSAW_CREATED_ORDERS_CHANNEL_ID,
+  WARSAW_APPROVED_ORDERS_CHANNEL_ID,
   emailTranslations,
   emailSubjectTranslation,
   confirmationEmailSubjectTranslation,
