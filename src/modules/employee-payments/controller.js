@@ -92,16 +92,18 @@ const EmployeePaymentsController = () => {
           'SELECT * FROM "order" ORDER BY id DESC',
         );
 
-        const ordersForLastPeriod = orders.filter(
-          ({ date, cleaner_id }) =>
-            cleaner_id &&
-            cleaner_id
-              .split(",")
-              .map((id) => +id)
-              .some((id) => userId === id) &&
-            getDateTimeObjectFromString(date) > prevTuesday &&
-            getDateTimeObjectFromString(date) < lastTuesday,
-        );
+        const ordersForLastPeriod = orders
+          .filter(({ status }) => status !== ORDER_STATUS.CLOSED)
+          .filter(
+            ({ date, cleaner_id }) =>
+              cleaner_id &&
+              cleaner_id
+                .split(",")
+                .map((id) => +id)
+                .some((id) => userId === id) &&
+              getDateTimeObjectFromString(date) > prevTuesday &&
+              getDateTimeObjectFromString(date) < lastTuesday,
+          );
         const orderIdsForLastPeriod = ordersForLastPeriod
           .map(({ id }) => id)
           .join(",");
