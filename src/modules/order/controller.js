@@ -101,7 +101,7 @@ const OrderController = () => {
       const { clientName, clientPhone } = req.query;
       const { role } = req;
 
-      if (role !== ROLES.ADMIN) {
+      if (![ROLES.ADMIN, ROLES.SUPERVISOR].includes(role)) {
         return res
           .status(403)
           .json({ message: "You don't have access to this" });
@@ -1153,7 +1153,7 @@ const OrderController = () => {
       const id = req.params.id;
       const { role } = req;
 
-      if (role !== ROLES.ADMIN) {
+      if (![ROLES.ADMIN, ROLES.SUPERVISOR].includes(role)) {
         return res
           .status(403)
           .json({ message: "You don't have access to this" });
