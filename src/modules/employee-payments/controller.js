@@ -12,6 +12,7 @@ const {
 } = require("../../utils");
 
 const { ORDER_STATUS } = require("../order/constants");
+const { ROLES } = require("../../constants");
 
 const getLastPaymentPeriod = () => {
   const lastTuesday = new Date();
@@ -20,7 +21,7 @@ const getLastPaymentPeriod = () => {
   lastTuesday.setHours(0, 0, 0, 0);
 
   const prevTuesday = new Date(
-    new Date(lastTuesday).setDate(lastTuesday.getDate() - 7)
+    new Date(lastTuesday).setDate(lastTuesday.getDate() - 7),
   );
 
   return {
@@ -39,7 +40,7 @@ const EmployeePaymentsController = () => {
     try {
       const result = await pool.query(
         "SELECT * FROM payments WHERE employee_id = $1 ORDER BY id DESC",
-        [userId]
+        [userId],
       );
 
       return res.status(200).json(result.rows);
@@ -51,13 +52,13 @@ const EmployeePaymentsController = () => {
   const getAllPayments = async (req, res) => {
     const { role } = req;
 
-    if (role !== constants.ROLES.ADMIN) {
+    if (![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(role)) {
       return res.status(403).json({ message: "You don't have access to this" });
     }
 
     try {
       const result = await pool.query(
-        "SELECT * FROM payments ORDER BY id DESC"
+        "SELECT * FROM payments ORDER BY id DESC",
       );
 
       return res.status(200).json(result.rows);
@@ -79,7 +80,7 @@ const EmployeePaymentsController = () => {
         rows: [{ exists }],
       } = await pool.query(
         "SELECT EXISTS(SELECT 1 FROM payments WHERE employee_id = $1 AND period_start = $2 AND period_end = $3)",
-        [userId, prevTuesdayString, lastTuesdayString]
+        [userId, prevTuesdayString, lastTuesdayString],
       );
 
       if (exists) {
@@ -88,7 +89,7 @@ const EmployeePaymentsController = () => {
           .json({ message: "Payment period already exists" });
       } else {
         const { rows: orders } = await pool.query(
-          'SELECT * FROM "order" ORDER BY id DESC'
+          'SELECT * FROM "order" ORDER BY id DESC',
         );
 
         const ordersForLastPeriod = orders.filter(
@@ -99,7 +100,7 @@ const EmployeePaymentsController = () => {
               .map((id) => +id)
               .some((id) => userId === id) &&
             getDateTimeObjectFromString(date) > prevTuesday &&
-            getDateTimeObjectFromString(date) < lastTuesday
+            getDateTimeObjectFromString(date) < lastTuesday,
         );
         const orderIdsForLastPeriod = ordersForLastPeriod
           .map(({ id }) => id)
@@ -113,7 +114,7 @@ const EmployeePaymentsController = () => {
               : order.price - (reward + order.extra_expenses);
 
             return result + invoice;
-          }, 0)
+          }, 0),
         );
 
         if (
@@ -135,7 +136,7 @@ const EmployeePaymentsController = () => {
               orderIdsForLastPeriod,
               amountToPay,
               `${firstName} ${lastName}`,
-            ]
+            ],
           );
 
           if (amountToPay > 0) {
@@ -144,7 +145,7 @@ const EmployeePaymentsController = () => {
               currency: "pln",
               receipt_email: email,
               description: `Employee ${firstName} ${lastName} payment for ${getDateWithoutTimeString(
-                prevTuesdayString
+                prevTuesdayString,
               )} - ${getDateWithoutTimeString(lastTuesdayString)} period`,
               metadata: { employeePaymentId: createdPaymentPeriod.id },
               ...(customerId && { customer: customerId }),
@@ -154,7 +155,7 @@ const EmployeePaymentsController = () => {
               rows: [updatedPaymentPeriod],
             } = await pool.query(
               `UPDATE payments SET payment_intent = $2, client_secret = $3 WHERE id = $1 RETURNING *`,
-              [createdPaymentPeriod.id, intent.id, intent.client_secret]
+              [createdPaymentPeriod.id, intent.id, intent.client_secret],
             );
 
             return res.status(200).json(updatedPaymentPeriod);
@@ -192,7 +193,7 @@ const EmployeePaymentsController = () => {
         rows: [updatedPayment],
       } = await pool.query(
         "UPDATE payments SET is_paid = $2 WHERE id = $1 RETURNING *",
-        [id, true]
+        [id, true],
       );
 
       return res.status(200).json(updatedPayment);
@@ -206,7 +207,7 @@ const EmployeePaymentsController = () => {
     const { amount } = req.body;
     const { role } = req;
 
-    if (role !== constants.ROLES.ADMIN) {
+    if (![constants.ROLES.ADMIN, constants.ROLES.SUPERVISOR].includes(role)) {
       return res.status(403).json({ message: "You don't have access to this" });
     }
 
@@ -231,7 +232,7 @@ const EmployeePaymentsController = () => {
         rows: [updatedPayment],
       } = await pool.query(
         "UPDATE payments SET amount = $2 WHERE id = $1 RETURNING *",
-        [id, amount]
+        [id, amount],
       );
 
       return res.status(200).json(updatedPayment);
