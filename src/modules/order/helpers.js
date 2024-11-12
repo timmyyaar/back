@@ -33,14 +33,14 @@ const sendConfirmationEmailAndTelegramMessage = async (
   locales,
   transporter,
   needToSendTelegramMessage,
-  mainCity,
+  isConfirmationEmailEnabled,
 ) => {
   const isDryOrOzonation = [
     ORDER_TITLES.DRY_CLEANING,
     ORDER_TITLES.OZONATION,
   ].includes(order.title);
 
-  if (!order.is_confirmed) {
+  if (!order.is_confirmed && isConfirmationEmailEnabled) {
     const currentLanguageLocales = locales
       .filter(({ locale }) => locale === order.language)
       .reduce(
@@ -77,7 +77,7 @@ const sendConfirmationEmailAndTelegramMessage = async (
 
   if (env.getEnvironment("MODE") === "prod" && needToSendTelegramMessage) {
     const approvedChannelId =
-      mainCity === CITIES.WARSAW
+      order.main_city === CITIES.WARSAW
         ? WARSAW_APPROVED_ORDERS_CHANNEL_ID
         : isDryOrOzonation
           ? APPROVED_DRY_OZONATION_CHANNEL_ID
@@ -124,12 +124,13 @@ const sendFeedbackEmailAndSetReminder = async (
   updatedOrder,
   connectedOrder,
   transporter,
+  isFeedbackEmailEnabled,
 ) => {
   const sendFeedbackLink =
     updatedOrder.feedback_link_id &&
     (!connectedOrder || connectedOrder.status === ORDER_STATUS.DONE);
 
-  if (sendFeedbackLink) {
+  if (sendFeedbackLink && isFeedbackEmailEnabled) {
     await transporter.sendMail({
       from: "tytfeedback@gmail.com",
       to: updatedOrder.email,

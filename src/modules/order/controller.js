@@ -1,6 +1,5 @@
-const pool = require("../../db/pool");
-
 const nodemailer = require("nodemailer");
+const pool = require("../../db/pool");
 
 const env = require("../../helpers/environments");
 
@@ -180,12 +179,11 @@ const OrderController = () => {
             existingPromo.count_used + 1 > existingPromo.count
           ) {
             return res.status(410).send("This promo is expired!");
-          } else {
-            await pool.query("UPDATE promo SET count_used = $1 WHERE id = $2", [
-              existingPromo.count_used + 1,
-              existingPromo.id,
-            ]);
           }
+          await pool.query("UPDATE promo SET count_used = $1 WHERE id = $2", [
+            existingPromo.count_used + 1,
+            existingPromo.id,
+          ]);
         }
 
         const isClientExists = await pool.query(
@@ -285,9 +283,9 @@ const OrderController = () => {
           return res
             .status(200)
             .json(result.rows.map((order) => ({ ...order, cleaner_id: [] })));
-        } else {
-          const result = await pool.query(
-            `INSERT INTO "order" 
+        }
+        const result = await pool.query(
+          `INSERT INTO "order" 
              (name, number, email, address, date, onlinePayment, 
              requestPreviousCleaner, personalData, price, promo, 
              estimate, title, counter, subService, total_service_price, 
@@ -297,61 +295,59 @@ const OrderController = () => {
              manual_cleaners_count, status, main_city) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
              $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31) RETURNING *`,
-            [
-              name,
-              number,
-              email,
-              address,
-              date,
-              onlinePayment,
-              requestPreviousCleaner,
-              personalData,
-              mainServicePrice,
-              promo,
-              mainServiceEstimate,
+          [
+            name,
+            number,
+            email,
+            address,
+            date,
+            onlinePayment,
+            requestPreviousCleaner,
+            personalData,
+            mainServicePrice,
+            promo,
+            mainServiceEstimate,
+            title,
+            counter,
+            subService,
+            price,
+            mainServicePriceOriginal,
+            priceOriginal,
+            additionalInformation,
+            isNewClient,
+            city,
+            transportationPrice,
+            mainServiceCleanersCount,
+            language,
+            creationDate,
+            ownCheckList,
+            getCleanerReward({
               title,
-              counter,
-              subService,
-              price,
-              mainServicePriceOriginal,
-              priceOriginal,
-              additionalInformation,
-              isNewClient,
-              city,
-              transportationPrice,
-              mainServiceCleanersCount,
-              language,
-              creationDate,
-              ownCheckList,
-              getCleanerReward({
-                title,
-                price_original: mainServicePriceOriginal,
-                cleaners_count: mainServiceCleanersCount,
-                estimate: mainServiceEstimate,
-                price: mainServicePrice,
-              }),
-              onlinePayment ? PAYMENT_STATUS.PENDING : null,
-              paymentIntentId,
-              mainServiceManualCleanersCount,
-              ORDER_STATUS.CREATED,
-              mainCity,
-            ],
-          );
+              price_original: mainServicePriceOriginal,
+              cleaners_count: mainServiceCleanersCount,
+              estimate: mainServiceEstimate,
+              price: mainServicePrice,
+            }),
+            onlinePayment ? PAYMENT_STATUS.PENDING : null,
+            paymentIntentId,
+            mainServiceManualCleanersCount,
+            ORDER_STATUS.CREATED,
+            mainCity,
+          ],
+        );
 
-          if (env.getEnvironment("MODE") === "prod") {
-            await sendTelegramMessage(date, createdOrdersChannelId, title);
-          }
-
-          const createdOrder = result.rows[0];
-
-          return res.status(200).json({
-            ...createdOrder,
-            cleaner_id: [],
-          });
+        if (env.getEnvironment("MODE") === "prod") {
+          await sendTelegramMessage(date, createdOrdersChannelId, title);
         }
-      } else {
-        return res.status(422).json({ message: "Unprocessable Entity" });
+
+        const createdOrder = result.rows[0];
+
+        return res.status(200).json({
+          ...createdOrder,
+          cleaner_id: [],
+        });
       }
+      return res.status(422).json({ message: "Unprocessable Entity" });
     } catch (error) {
       return res.status(500).json({ error });
     }
@@ -415,7 +411,7 @@ const OrderController = () => {
 
   const assignOrder = async (req, res) => {
     try {
-      const id = req.params.id;
+      const { id } = req.params;
       const { cleanerId = [] } = req.body;
 
       const existingOrderQuery = await pool.query(
@@ -459,12 +455,19 @@ const OrderController = () => {
 
       if (isApprovedStatus) {
         const { rows: locales } = await pool.query("SELECT * FROM locales");
+        const {
+          rows: [confirmationEmailSetting],
+        } = await pool.query("SELECT * FROM settings WHERE name = $1", [
+          "send_create_order_email",
+        ]);
 
         await sendConfirmationEmailAndTelegramMessage(
           existingOrder,
           updatedCheckList,
           locales,
           transporter,
+          false,
+          confirmationEmailSetting?.value === "true",
         );
       }
 
@@ -549,8 +552,8 @@ const OrderController = () => {
 
   const updateOrderStatus = async (req, res) => {
     try {
-      const id = req.params.id;
-      const status = req.params.status;
+      const { id } = req.params;
+      const { status } = req.params;
 
       const isAdmin = [ROLES.ADMIN, ROLES.SUPERVISOR].includes(req.role);
 
@@ -663,6 +666,11 @@ const OrderController = () => {
 
       if (status === ORDER_STATUS.APPROVED) {
         const { rows: locales } = await pool.query("SELECT * FROM locales");
+        const {
+          rows: [confirmationEmailSetting],
+        } = await pool.query("SELECT * FROM settings WHERE name = $1", [
+          "send_create_order_email",
+        ]);
 
         await sendConfirmationEmailAndTelegramMessage(
           existingOrder,
@@ -670,14 +678,22 @@ const OrderController = () => {
           locales,
           transporter,
           true,
+          confirmationEmailSetting?.value === "true",
         );
       }
 
       if (status === ORDER_STATUS.DONE) {
+        const {
+          rows: [feedbackEmailSetting],
+        } = await pool.query("SELECT * FROM settings WHERE name = $1", [
+          "send_feedback_email",
+        ]);
+
         await sendFeedbackEmailAndSetReminder(
           updatedOrder,
           connectedOrder,
           transporter,
+          feedbackEmailSetting?.value === "true",
         );
       }
 
@@ -697,7 +713,7 @@ const OrderController = () => {
 
   const updateOrder = async (req, res) => {
     try {
-      const id = req.params.id;
+      const { id } = req.params;
       const {
         name,
         number,
@@ -829,17 +845,17 @@ const OrderController = () => {
 
   const sendFeedback = async (req, res) => {
     try {
-      const id = req.params.id;
+      const { id } = req.params;
       const { feedback, rating } = req.body;
 
       const existingOrder = await pool.query(
-        `SELECT * FROM "order" WHERE id = $1`,
+        'SELECT * FROM "order" WHERE id = $1',
         [id],
       );
 
       if (!existingOrder.rows[0].feedback) {
         const orderQuery = await pool.query(
-          `UPDATE "order" SET feedback = $2, rating = $3 WHERE id = $1 RETURNING *`,
+          'UPDATE "order" SET feedback = $2, rating = $3 WHERE id = $1 RETURNING *',
           [id, feedback, rating],
         );
 
@@ -868,9 +884,8 @@ const OrderController = () => {
                 "UPDATE users SET rating = $2 WHERE id = $1 RETURNING *",
                 [id, updatedRating],
               );
-            } else {
-              return await Promise.resolve();
             }
+            return await Promise.resolve();
           }),
         );
 
@@ -885,8 +900,8 @@ const OrderController = () => {
 
   const refuseOrder = async (req, res) => {
     try {
-      const id = req.params.id;
-      const userId = req.userId;
+      const { id } = req.params;
+      const { userId } = req;
 
       const existingOrderQuery = await pool.query(
         'SELECT * FROM "order" WHERE id = $1',
@@ -904,7 +919,7 @@ const OrderController = () => {
         .join(",");
 
       const result = await pool.query(
-        `UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *`,
+        'UPDATE "order" SET cleaner_id = $2 WHERE id = $1 RETURNING *',
         [id, updatedCleanerIds],
       );
 
@@ -920,11 +935,11 @@ const OrderController = () => {
 
   const updateOrderExtraExpenses = async (req, res) => {
     try {
-      const id = req.params.id;
+      const { id } = req.params;
       const { extraExpenses } = req.body;
 
       const result = await pool.query(
-        `UPDATE "order" SET extra_expenses = $2 WHERE id = $1 RETURNING *`,
+        'UPDATE "order" SET extra_expenses = $2 WHERE id = $1 RETURNING *',
         [id, extraExpenses],
       );
 
@@ -992,7 +1007,7 @@ const OrderController = () => {
         const {
           rows: [updatedOrder],
         } = await pool.query(
-          `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
+          'UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *',
           [id, paymentIntent.id, PAYMENT_STATUS.PENDING],
         );
 
@@ -1002,7 +1017,7 @@ const OrderController = () => {
           const {
             rows: [updatedConnectedOrder],
           } = await pool.query(
-            `UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *`,
+            'UPDATE "order" SET payment_intent = $2, payment_status = $3 WHERE id = $1 RETURNING *',
             [connectedOrder.id, paymentIntent.id, PAYMENT_STATUS.PENDING],
           );
 
@@ -1044,7 +1059,7 @@ const OrderController = () => {
         const {
           rows: [updatedOrder],
         } = await pool.query(
-          `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
+          'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
           [id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION],
         );
 
@@ -1069,7 +1084,7 @@ const OrderController = () => {
           const {
             rows: [updatedConnectedOrder],
           } = await pool.query(
-            `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
+            'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
             [connectedOrder.id, PAYMENT_STATUS.WAITING_FOR_CONFIRMATION],
           );
 
@@ -1080,9 +1095,8 @@ const OrderController = () => {
           isSynced: false,
           updatedOrders: getOrdersWithCleaners(updatedOrdersResult),
         });
-      } else {
-        return res.status(200).json({ isSynced: true });
       }
+      return res.status(200).json({ isSynced: true });
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error });
@@ -1150,7 +1164,7 @@ const OrderController = () => {
 
   const markOrderAsPaid = async (req, res) => {
     try {
-      const id = req.params.id;
+      const { id } = req.params;
       const { role } = req;
 
       if (![ROLES.ADMIN, ROLES.SUPERVISOR].includes(role)) {
@@ -1185,7 +1199,7 @@ const OrderController = () => {
       const {
         rows: [updatedOrder],
       } = await pool.query(
-        `UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *`,
+        'UPDATE "order" SET payment_status = $2 WHERE id = $1 RETURNING *',
         [id, PAYMENT_STATUS.CONFIRMED],
       );
 
