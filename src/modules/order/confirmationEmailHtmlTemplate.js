@@ -26,7 +26,7 @@ const WHAT_WE_DONT_DO = [
 const getConfirmationEmailHtmlTemplate = (
   updatedOrder,
   locales,
-  updatedCheckList
+  updatedCheckList,
 ) => {
   const t = emailTranslations[updatedOrder.language];
   const parsedCheckList = updatedCheckList ? JSON.parse(updatedCheckList) : {};
@@ -42,7 +42,7 @@ const getConfirmationEmailHtmlTemplate = (
             .join("; "),
         ],
       ],
-      []
+      [],
     )
     .filter(([_, value]) => value.length > 0);
 
@@ -102,9 +102,12 @@ const getConfirmationEmailHtmlTemplate = (
                     <div style="color: black;">
 											  ${t.cleaning_scheduled(updatedOrder.date, checkListEntries.length > 0)}
                     </div>
-                    <div style="margin-top: 16px; color: black;">${
-                      t.if_the_apartment_is_too_dirty
-                    }</div>
+                    <div style="margin-top: 16px; color: black;">
+                        ${t.if_the_apartment_is_too_dirty}
+                    </div>
+                    <div style="margin-top: 16px; color: black; font-size: 18px; line-height: 22px; font-weight: bold;">
+                        ${t.service_price}: ${updatedOrder.price} ${locales.zl}
+                    </div>
                     ${
                       checkListEntries.length > 0
                         ? `<div style="margin-top: 16px; margin-bottom: 16px;">
@@ -121,7 +124,7 @@ const getConfirmationEmailHtmlTemplate = (
 													<b style="font-size: 18px; line-height: 22px; color: black;">${title}:</b>
 													<br />
 												</div>
-												<span style="color: black;">${services}</span>`
+												<span style="color: black;">${services}</span>`,
                       )
                       .join("")}
                     <div style="margin-top: 16px; margin-bottom: 16px;">
@@ -136,7 +139,7 @@ const getConfirmationEmailHtmlTemplate = (
                             <br />
                             <span style="color: black;">${locales[description]}</span>
                             <br />
-                        </div>`
+                        </div>`,
                     ).join("")}
                     <div>
                         <p style="margin-top: 36px; color: black;">${t.warm_regards}</p>
@@ -145,7 +148,7 @@ const getConfirmationEmailHtmlTemplate = (
                                 <span style="font-weight: 600;">Web-page: </span><a href="https://www.takeutime.pl/" target="_blank">https://www.takeutime.pl/</a>
                             </div>
                             <div style="color: black;">
-                                <span style="font-weight: 600;">Instagram: </span><a href="https://www.instagram.com/takeyourtime_krakow/" target="_blank">https://www.instagram.com/takeyourtime_krakow/</a>
+                                <span style="font-weight: 600;">Instagram: </span><a href="https://www.instagram.com/takeyourtime_pln/" target="_blank">https://www.instagram.com/takeyourtime_pln/</a>
                             </div>
                             <div style="color: black;">
                                 <span style="font-weight: 600;">Tiktok: </span><a href="https://www.tiktok.com/@takeyourtime_krk" target="_blank">https://www.tiktok.com/@takeyourtime_krk</a>
