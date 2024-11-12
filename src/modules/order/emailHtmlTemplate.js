@@ -68,7 +68,7 @@ const getEmailHtmlTemplate = (updatedOrder) => {
                                 <span style="font-weight: 600;">Web-page: </span><a href="https://www.takeutime.pl/" target="_blank">https://www.takeutime.pl/</a>
                             </div>
                             <div style="color: black;">
-                                <span style="font-weight: 600;">Instagram: </span><a href="https://www.instagram.com/takeyourtime_krakow/" target="_blank">https://www.instagram.com/takeyourtime_krakow/</a>
+                                <span style="font-weight: 600;">Instagram: </span><a href="https://www.instagram.com/takeyourtime_pln/" target="_blank">https://www.instagram.com/takeyourtime_pln/</a>
                             </div>
                             <div style="color: black;">
                                 <span style="font-weight: 600;">Tiktok: </span><a href="https://www.tiktok.com/@takeyourtime_krk" target="_blank">https://www.tiktok.com/@takeyourtime_krk</a>
