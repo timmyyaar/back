@@ -37,11 +37,11 @@ const getEstimateInTimeFormat = (estimate) => {
   const estimateArray = estimate.split(", ");
   const estimateHours = +estimateArray[0].slice(
     0,
-    estimateArray[0].indexOf("h")
+    estimateArray[0].indexOf("h"),
   );
   const estimateMinutes = +estimateArray[1].slice(
     0,
-    estimateArray[1].indexOf("m")
+    estimateArray[1].indexOf("m"),
   );
 
   const estimateHoursWithPrefix = getTimeUnitWithPrefix(estimateHours);
@@ -67,7 +67,7 @@ const getOrderTimeSlot = (
   startTime,
   endTime,
   startTimeOfSlot,
-  endTimeOfSlot
+  endTimeOfSlot,
 ) => {
   const startTimeNumeric = Number(startTime.split(":").join("."));
   const endTimeNumeric = Number(endTime.split(":").join("."));
@@ -164,7 +164,7 @@ const getUpdatedScheduleDetailsForEdit = (existingSchedule, scheduleParts) => {
 
 const getUpdatedScheduleDetailsForDelete = (
   existingSchedule,
-  scheduleParts
+  scheduleParts,
 ) => {
   const updatedFirstPeriod =
     !existingSchedule.first_period && !scheduleParts.firstPeriod
@@ -232,23 +232,23 @@ const getOrderCheckList = (order) => {
       return {
         bedroom: REGULAR_BEDROOM.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         kitchen: REGULAR_KITCHEN.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         corridor: REGULAR_CORRIDOR.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         bathroom: REGULAR_BATHROOM.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         subServices: getSubServicesList(order.subservice).reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
       };
     case ORDER_TYPES.DEEP:
@@ -256,57 +256,57 @@ const getOrderCheckList = (order) => {
       return {
         bedroom: DEEP_CLEANING_BEDROOM.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         kitchen: DEEP_CLEANING_KITCHEN.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         corridor: DEEP_CLEANING_CORRIDOR.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         bathroom: DEEP_CLEANING_BATHROOM.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         balcony: DEEP_CLEANING_BALCONY.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         subServices: getSubServicesList(order.subservice).reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
       };
     case ORDER_TYPES.POST_CONSTRUCTION:
       return {
         bathroom: POST_CONSTRUCTION_BATHROOM.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         kitchen: POST_CONSTRUCTION_KITCHEN.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         residentialArea: POST_CONSTRUCTION_RESIDENTIAL_AREA.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         subServices: getSubServicesList(order.subservice).reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
       };
     case ORDER_TYPES.WINDOW:
       return {
         windows: WINDOWS.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         subServices: getSubServicesList(order.subservice).reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
       };
     case ORDER_TYPES.OFFICE:
@@ -314,98 +314,98 @@ const getOrderCheckList = (order) => {
         ? {
             office: OFFICE.reduce(
               (result, item) => ({ ...result, [item]: false }),
-              {}
+              {},
             ),
           }
         : {
             residentialArea: OFFICE_RESIDENTIAL_AREA.reduce(
               (result, item) => ({ ...result, [item]: false }),
-              {}
+              {},
             ),
             kitchen: OFFICE_KITCHEN.reduce(
               (result, item) => ({ ...result, [item]: false }),
-              {}
+              {},
             ),
             bathroom: OFFICE_BATHROOM.reduce(
               (result, item) => ({ ...result, [item]: false }),
-              {}
+              {},
             ),
           };
     case ORDER_TYPES.DEEP_KITCHEN:
       return {
         deepKitchen: DEEP_KITCHEN.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
         subServices: getSubServicesList(order.subservice).reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
       };
     case ORDER_TYPES.CUSTOM:
       return {
         ...(order.subservice.includes(
-          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.CLOAK
+          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.CLOAK,
         ) && {
           cleanTheCloakRoom: CUSTOM_CLOAK_ROOM.reduce(
             (result, item) => ({ ...result, [item]: false }),
-            {}
+            {},
           ),
         }),
         ...(order.subservice.includes(
-          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.ROOM
+          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.ROOM,
         ) && {
           bedroom: CUSTOM_BEDROOM.reduce(
             (result, item) => ({ ...result, [item]: false }),
-            {}
+            {},
           ),
         }),
         ...(order.subservice.includes(
-          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.KITCHEN
+          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.KITCHEN,
         ) && {
           kitchen: CUSTOM_KITCHEN.reduce(
             (result, item) => ({ ...result, [item]: false }),
-            {}
+            {},
           ),
         }),
         ...(order.subservice.includes(
-          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.CORRIDOR
+          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.CORRIDOR,
         ) && {
           corridor: REGULAR_CORRIDOR.reduce(
             (result, item) => ({ ...result, [item]: false }),
-            {}
+            {},
           ),
         }),
         ...(order.subservice.includes(
-          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.BATHROOM
+          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.BATHROOM,
         ) && {
           bathroom: CUSTOM_BATHROOM.reduce(
             (result, item) => ({ ...result, [item]: false }),
-            {}
+            {},
           ),
         }),
         ...(order.subservice.includes(
-          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.BALCONY
+          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.BALCONY,
         ) && {
           balcony: CUSTOM_BALCONY.reduce(
             (result, item) => ({ ...result, [item]: false }),
-            {}
+            {},
           ),
         }),
         ...(order.subservice.includes(
-          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.WINDOW
+          CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES.WINDOW,
         ) && {
           windows: CUSTOM_WINDOWS.reduce(
             (result, item) => ({ ...result, [item]: false }),
-            {}
+            {},
           ),
         }),
         subServices: getSubServicesList(order.subservice)
           .filter(
             (service) =>
               !Object.values(
-                CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES
-              ).includes(service)
+                CUSTOM_CLEANING_ADDITIONAL_MAIN_SERVICES_TITLES,
+              ).includes(service),
           )
           .reduce((result, item) => ({ ...result, [item]: false }), {}),
       };
@@ -413,7 +413,7 @@ const getOrderCheckList = (order) => {
       return {
         whileSickness: WHILE_SICK.reduce(
           (result, item) => ({ ...result, [item]: false }),
-          {}
+          {},
         ),
       };
     default:
@@ -424,14 +424,14 @@ const getOrderCheckList = (order) => {
 const sendTelegramMessage = async (date, channel, title) => {
   await fetch(
     `https://api.telegram.org/bot${env.getEnvironment(
-      "TELEGRAM_BOT_ID"
+      "TELEGRAM_BOT_ID",
     )}/sendMessage?` +
       new URLSearchParams({
         chat_id: channel,
         text: `New ${title ? `${title} ` : ""}order!\n${date
           .replaceAll("/", ".")
           .replace(" ", ", ")}`,
-      })
+      }),
   );
 };
 
