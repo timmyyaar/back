@@ -52,6 +52,9 @@ const {
   WARSAW_CREATED_ORDERS_CHANNEL_ID,
   ORDER_STATUS,
   ORDER_TITLES,
+  WARSAW_APPROVED_ORDERS_CHANNEL_ID,
+  APPROVED_DRY_OZONATION_CHANNEL_ID,
+  APPROVED_REGULAR_CHANNEL_ID,
 } = require("./constants");
 
 const OrderController = () => {
@@ -711,6 +714,51 @@ const OrderController = () => {
     }
   };
 
+  const resetOrder = async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const isAdmin = [ROLES.ADMIN, ROLES.SUPERVISOR].includes(req.role);
+
+      if (!isAdmin) {
+        return res
+          .status(403)
+          .json({ message: "You don't have access to this!" });
+      }
+
+      const {
+        rows: [updatedOrder],
+      } = await pool.query(
+        'UPDATE "order" SET status = $2, cleaner_id = $3 WHERE id = $1 RETURNING *',
+        [id, ORDER_STATUS.APPROVED, null],
+      );
+
+      if (env.getEnvironment("MODE") === "prod") {
+        const isDryOrOzonation = [
+          ORDER_TITLES.DRY_CLEANING,
+          ORDER_TITLES.OZONATION,
+        ].includes(order.title);
+
+        const approvedChannelId =
+          updatedOrder.main_city === CITIES.WARSAW
+            ? WARSAW_APPROVED_ORDERS_CHANNEL_ID
+            : isDryOrOzonation
+              ? APPROVED_DRY_OZONATION_CHANNEL_ID
+              : APPROVED_REGULAR_CHANNEL_ID;
+
+        await sendTelegramMessage(
+          updatedOrder.date,
+          approvedChannelId,
+          updatedOrder.title,
+        );
+      }
+
+      return res.status(200).json(getOrdersWithCleaners([updatedOrder])[0]);
+    } catch (error) {
+      return res.status(500).json({ error });
+    }
+  };
+
   const updateOrder = async (req, res) => {
     try {
       const { id } = req.params;
@@ -1239,6 +1287,7 @@ const OrderController = () => {
     syncOrderPaymentIntent,
     approvePayment,
     markOrderAsPaid,
+    resetOrder,
   };
 };
 

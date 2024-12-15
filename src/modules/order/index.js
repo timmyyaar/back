@@ -14,7 +14,7 @@ orderRouter
   .get(
     "/order/client-orders/get-all",
     verifyToken,
-    orderController.getAllClientOrders
+    orderController.getAllClientOrders,
   )
   .put("/order/:id", verifyToken, orderController.updateOrder)
   .delete("/order/:id", verifyToken, orderController.deleteOrder)
@@ -22,30 +22,31 @@ orderRouter
   .patch(
     "/order/extra-expenses/:id",
     verifyToken,
-    orderController.updateOrderExtraExpenses
+    orderController.updateOrderExtraExpenses,
   )
   .patch("/order/:id/assign", verifyToken, orderController.assignOrder)
   .patch("/order/:id/:cleanerId", verifyToken, orderController.assignOnMe)
   .patch(
     "/order/:id/update-status/:status",
     verifyToken,
-    orderController.updateOrderStatus
+    orderController.updateOrderStatus,
   )
   .put(
     "/order/:id/payment-intent",
     verifyToken,
-    orderController.connectPaymentIntent
+    orderController.connectPaymentIntent,
   )
   .put(
     "/order/:id/sync-payment",
     verifyToken,
-    orderController.syncOrderPaymentIntent
+    orderController.syncOrderPaymentIntent,
   )
   .put(
     "/order/:id/approve-payment",
     verifyToken,
-    orderController.approvePayment
+    orderController.approvePayment,
   )
-  .put("/order/:id/mark-as-paid", verifyToken, orderController.markOrderAsPaid);
+  .put("/order/:id/mark-as-paid", verifyToken, orderController.markOrderAsPaid)
+  .put("/order/:id/reset", verifyToken, orderController.resetOrder);
 
 module.exports = orderRouter;
