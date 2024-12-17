@@ -19,20 +19,20 @@ const getCleanerReward = ({
   if ([ORDER_TYPES.DRY, ORDER_TYPES.OZONATION].includes(title)) {
     return getFloatOneDigit(price / 2 / cleaners_count);
   } else {
-    if (price_original <= getEnvironment("MIDDLE_ORDER_ESTIMATE")) {
+    if (price_original <= Number(getEnvironment("MIDDLE_ORDER_ESTIMATE"))) {
       return getFloatOneDigit(
-        numericEstimate * getEnvironment("DEFAULT_ORDER_PER_HOUR_PRICE")
+        numericEstimate * getEnvironment("DEFAULT_ORDER_PER_HOUR_PRICE"),
       );
     } else if (
-      price_original > getEnvironment("MIDDLE_ORDER_ESTIMATE") &&
-      price_original <= getEnvironment("HIGH_ORDER_ESTIMATE")
+      price_original > Number(getEnvironment("MIDDLE_ORDER_ESTIMATE")) &&
+      price_original <= Number(getEnvironment("HIGH_ORDER_ESTIMATE"))
     ) {
       return getFloatOneDigit(
-        numericEstimate * getEnvironment("MIDDLE_ORDER_PER_HOUR_PRICE")
+        numericEstimate * getEnvironment("MIDDLE_ORDER_PER_HOUR_PRICE"),
       );
     } else {
       return getFloatOneDigit(
-        numericEstimate * getEnvironment("HIGH_ORDER_PER_HOUR_PRICE")
+        numericEstimate * getEnvironment("HIGH_ORDER_PER_HOUR_PRICE"),
       );
     }
   }
