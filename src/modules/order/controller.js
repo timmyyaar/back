@@ -782,7 +782,6 @@ const OrderController = () => {
         ownCheckList = false,
         cleanersCount,
         aggregator,
-        reward_original,
       } = req.body;
 
       const {
@@ -834,7 +833,7 @@ const OrderController = () => {
                counter = $11, subService = $12, total_service_price = $13,
                total_service_price_original = $14, price_original = $15,
                note = $16, reward = $17, own_check_list = $18, payment_intent = $19, payment_status = $20,
-               cleaners_count = $21, aggregator = $22, reward_original = $23
+               cleaners_count = $21, aggregator = $22
                WHERE id = $1 RETURNING *`,
         [
           id,
@@ -859,7 +858,6 @@ const OrderController = () => {
           wasOnlinePaymentChanged ? null : existingOrder.payment_status,
           cleanersCount,
           aggregator,
-          reward_original,
         ],
       );
 
