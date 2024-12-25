@@ -50,13 +50,21 @@ const PricesController = () => {
 
     try {
       await Promise.all(
-        prices.map(
-          async ({ key, price }) =>
-            await pool.query("UPDATE prices SET price = $2 WHERE key = $1", [
-              key,
-              price,
-            ]),
-        ),
+        prices.map(async ({ key, price, city }) => {
+          const {
+            rows: [existingPrice],
+          } = await pool.query(
+            "SELECT * FROM prices WHERE key = $1 AND city = $2",
+            [key, city || 'Krakow'],
+          );
+
+          await pool.query(
+            existingPrice
+              ? "UPDATE prices SET price = $1 WHERE key = $2 AND city = $3"
+              : "INSERT INTO prices (price, key, city) VALUES ($1, $2, $3)",
+            [price, key, city || 'Krakow'],
+          );
+        }),
       );
 
       return res.json({ message: "Prices have been updated!" });
