@@ -16,6 +16,8 @@ const pricesRouter = require("../modules/prices");
 const paymentRouter = require("../modules/payment");
 const employeePaymentsRouter = require("../modules/employee-payments");
 const settingsRouter = require("../modules/settings");
+const mainServicesRouter = require("../modules/main-services");
+const subServicesRouter = require("../modules/sub-services");
 
 const router = express.Router();
 
@@ -35,6 +37,8 @@ router
   .use(pricesRouter)
   .use(paymentRouter)
   .use(employeePaymentsRouter)
-  .use(settingsRouter);
+  .use(settingsRouter)
+  .use(mainServicesRouter)
+  .use(subServicesRouter);
 
 module.exports = router;
