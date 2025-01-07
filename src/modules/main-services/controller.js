@@ -3,11 +3,15 @@ const pool = require("../../db/pool");
 const constants = require("../../constants");
 
 const MainServicesController = () => {
+  let retriesCount = 0;
+
   const getMainServices = async (req, res) => {
     try {
       const { rows } = await pool.query(
         "SELECT * FROM main_services ORDER BY id ASC",
       );
+
+      retriesCount = 0;
 
       return res.json(
         rows.map((mainService) => {
@@ -22,7 +26,16 @@ const MainServicesController = () => {
         }),
       );
     } catch (error) {
-      return res.status(500).json({ error });
+      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        retriesCount++;
+
+        setTimeout(
+          async () => await getMainServices(req, res),
+          constants.DEFAULT_RETRIES_DELAY,
+        );
+      } else {
+        return res.status(500).json({ error });
+      }
     }
   };
 
