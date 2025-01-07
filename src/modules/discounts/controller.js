@@ -1,15 +1,29 @@
 const pool = require("../../db/pool");
+const constants = require("../../constants");
 
 const DiscountsController = () => {
+  let retriesCount = 0;
+
   const getDiscounts = async (req, res) => {
     try {
       const result = await pool.query(
-        "SELECT * FROM discounts ORDER BY id ASC"
+        "SELECT * FROM discounts ORDER BY id ASC",
       );
 
-      res.json(result.rows);
+      retriesCount = 0;
+
+      return res.json(result.rows);
     } catch (error) {
-      res.status(500).json({ error });
+      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        retriesCount++;
+
+        setTimeout(
+          async () => await getDiscounts(req, res),
+          constants.DEFAULT_RETRIES_DELAY,
+        );
+      } else {
+        return res.status(500).json({ error });
+      }
     }
   };
 
@@ -20,7 +34,7 @@ const DiscountsController = () => {
       if (date && value) {
         const existingDiscount = await pool.query(
           "SELECT * FROM discounts WHERE date = $1",
-          [date]
+          [date],
         );
 
         if (existingDiscount.rows[0]) {
@@ -31,7 +45,7 @@ const DiscountsController = () => {
 
         const result = await pool.query(
           "INSERT INTO discounts(date, value) VALUES($1, $2) RETURNING *",
-          [date, value]
+          [date, value],
         );
 
         res.status(200).json(result.rows[0]);
@@ -53,11 +67,11 @@ const DiscountsController = () => {
       if (date && value) {
         const existingDiscount = await pool.query(
           "SELECT * FROM discounts WHERE id = $1",
-          [id]
+          [id],
         );
         const existingDiscountWithDate = await pool.query(
           "SELECT * FROM discounts WHERE id != $1 AND date = $2",
-          [id, date]
+          [id, date],
         );
 
         if (existingDiscount.rowCount === 0) {
@@ -72,7 +86,7 @@ const DiscountsController = () => {
 
         const result = await pool.query(
           "UPDATE discounts SET date = $2, value = $3 WHERE id = $1 RETURNING *",
-          [id, date, value]
+          [id, date, value],
         );
 
         res.status(200).json(result.rows[0]);
@@ -92,7 +106,7 @@ const DiscountsController = () => {
 
       const result = await pool.query(
         "DELETE FROM discounts WHERE id = $1 RETURNING *",
-        [id]
+        [id],
       );
 
       res

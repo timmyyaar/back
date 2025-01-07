@@ -3,13 +3,26 @@ const pool = require("../../db/pool");
 const constants = require("../../constants");
 
 const PricesController = () => {
+  let retriesCount = 0;
+
   const getPrices = async (req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM prices");
 
+      retriesCount = 0;
+
       return res.json(rows);
     } catch (error) {
-      return res.status(500).json({ error });
+      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        retriesCount++;
+
+        setTimeout(
+          async () => await getPrices(req, res),
+          constants.DEFAULT_RETRIES_DELAY,
+        );
+      } else {
+        return res.status(500).json({ error });
+      }
     }
   };
 
