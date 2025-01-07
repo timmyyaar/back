@@ -4,18 +4,30 @@ const constants = require("../../constants");
 const { getTransformedSubService } = require("./utils");
 
 const SubServicesController = () => {
+  let retriesCount = 0;
+
   const getSubServices = async (req, res) => {
     try {
       const { rows } = await pool.query(
         "SELECT * FROM sub_services ORDER BY id ASC",
       );
 
+      retriesCount = 0;
+
       return res.json(
         rows.map((subService) => getTransformedSubService(subService)),
       );
     } catch (error) {
-      console.log(error);
-      return res.status(500).json({ error });
+      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        retriesCount++;
+
+        setTimeout(
+          async () => await getSubServices(req, res),
+          constants.DEFAULT_RETRIES_DELAY,
+        );
+      } else {
+        return res.status(500).json({ error });
+      }
     }
   };
 
