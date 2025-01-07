@@ -3,13 +3,26 @@ const pool = require("../../db/pool");
 const constants = require("../../constants");
 
 const ReviewsController = () => {
+  let retriesCount = 0;
+
   const getReviews = async (req, res) => {
     try {
       const result = await pool.query("SELECT * FROM reviews ORDER BY id ASC");
 
+      retriesCount = 0;
+
       return res.json(result.rows);
     } catch (error) {
-      return res.status(500).json({ error });
+      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        retriesCount++;
+
+        setTimeout(
+          async () => await getReviews(req, res),
+          constants.DEFAULT_RETRIES_DELAY,
+        );
+      } else {
+        return res.status(500).json({ error });
+      }
     }
   };
 
@@ -24,7 +37,7 @@ const ReviewsController = () => {
 
         const result = await pool.query(
           "INSERT INTO reviews(rating, name, email, text, visible) VALUES($1, $2, $3, $4, $5) RETURNING *",
-          [rating, name, email, text, visible ? "1" : "0"]
+          [rating, name, email, text, visible ? "1" : "0"],
         );
 
         res.status(200).json(result.rows[0]);
@@ -50,7 +63,7 @@ const ReviewsController = () => {
 
         const reviewExists = await pool.query(
           "SELECT * FROM reviews WHERE id = $1",
-          [id]
+          [id],
         );
 
         if (reviewExists.rowCount === 0) {
@@ -58,7 +71,7 @@ const ReviewsController = () => {
         } else {
           const result = await pool.query(
             "UPDATE reviews SET rating = $2, name = $3, email = $4, text = $5, visible = $6 WHERE id = $1 RETURNING *",
-            [id, rating, name, email, text, visible ? "1" : "0"]
+            [id, rating, name, email, text, visible ? "1" : "0"],
           );
 
           res.status(200).json(result.rows[0]);
@@ -79,7 +92,7 @@ const ReviewsController = () => {
 
       const result = await pool.query(
         "DELETE FROM reviews WHERE id = $1 RETURNING *",
-        [id]
+        [id],
       );
 
       res

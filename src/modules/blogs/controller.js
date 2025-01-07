@@ -4,8 +4,11 @@ const { put, del } = require("@vercel/blob");
 const { formidable } = require("formidable");
 
 const env = require("../../helpers/environments");
+const constants = require("../../constants");
 
 const BlogsController = () => {
+  let retriesCount = 0;
+
   const getBlogs = async (req, res) => {
     const { id } = req.params;
 
@@ -14,13 +17,24 @@ const BlogsController = () => {
         ? await pool.query("SELECT * FROM blogs WHERE id = $1", [id])
         : await pool.query("SELECT * FROM blogs ORDER BY id DESC");
 
+      retriesCount = 0;
+
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "No blogs found" });
       }
 
       return res.json(id ? result.rows[0] : result.rows);
     } catch (error) {
-      return res.status(500).json({ error });
+      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        retriesCount++;
+
+        setTimeout(
+          async () => await getBlogs(req, res),
+          constants.DEFAULT_RETRIES_DELAY,
+        );
+      } else {
+        return res.status(500).json({ error });
+      }
     }
   };
 
@@ -45,7 +59,7 @@ const BlogsController = () => {
           {
             token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
             access: "public",
-          }
+          },
         );
         const uploadedBlogImageOne = await put(
           blogImageOne.originalFilename,
@@ -55,7 +69,7 @@ const BlogsController = () => {
           {
             token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
             access: "public",
-          }
+          },
         );
         const uploadedBlogImageTwo = await put(
           blogImageTwo.originalFilename,
@@ -65,7 +79,7 @@ const BlogsController = () => {
           {
             token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
             access: "public",
-          }
+          },
         );
 
         const newBlogQuery = await pool.query(
@@ -80,7 +94,7 @@ const BlogsController = () => {
             uploadedBlogImageTwo.url,
             fields.readTime[0],
             fields.text[0],
-          ]
+          ],
         );
 
         return res.status(200).json(newBlogQuery.rows[0]);
@@ -113,7 +127,7 @@ const BlogsController = () => {
 
         const existingBlogQuery = await pool.query(
           "SELECT * FROM blogs WHERE id = $1",
-          [id]
+          [id],
         );
         const existingBlog = existingBlogQuery.rows[0];
 
@@ -126,7 +140,7 @@ const BlogsController = () => {
               {
                 token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
                 access: "public",
-              }
+              },
             )
           : null;
         const uploadedBlogImageOne = srcToImageOne
@@ -138,7 +152,7 @@ const BlogsController = () => {
               {
                 token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
                 access: "public",
-              }
+              },
             )
           : null;
         const uploadedBlogImageTwo = srcToImageTwo
@@ -150,7 +164,7 @@ const BlogsController = () => {
               {
                 token: env.getEnvironment("BLOB_TOKEN_IMAGES"),
                 access: "public",
-              }
+              },
             )
           : null;
 
@@ -172,7 +186,7 @@ const BlogsController = () => {
               : fields.imageTwo[0],
             fields.readTime[0],
             fields.text[0],
-          ]
+          ],
         );
 
         if (mainImage) {
@@ -201,13 +215,12 @@ const BlogsController = () => {
   };
 
   const deleteBlog = async (req, res) => {
-    const { mainImageUrl, blogImageOneUrl, blogImageTwoUrl } = req.body;
     const { id } = req.params;
 
     try {
       const existingBlogQuery = await pool.query(
         "SELECT * FROM blogs WHERE id = $1",
-        [id]
+        [id],
       );
       const existingBlog = existingBlogQuery.rows[0];
 
