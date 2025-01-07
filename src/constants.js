@@ -42,6 +42,9 @@ const STRIPE_PAYMENT_STATUS = {
 
 const CITIES = { WARSAW: "Warsaw", KRAKOW: "Krakow" };
 
+const DEFAULT_RETRIES_COUNT = 3;
+const DEFAULT_RETRIES_DELAY = 500;
+
 module.exports = {
   EMAIL_REGEX,
   BRACKETS_REGEX,
@@ -50,4 +53,6 @@ module.exports = {
   PAYMENT_STATUS,
   STRIPE_PAYMENT_STATUS,
   CITIES,
+  DEFAULT_RETRIES_COUNT,
+  DEFAULT_RETRIES_DELAY,
 };
