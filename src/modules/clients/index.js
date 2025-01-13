@@ -8,6 +8,7 @@ const clientsRouter = new Router();
 
 clientsRouter
   .get("/clients", verifyToken, clientsController.getClients)
+  .get("/clients/emails", verifyToken, clientsController.getClientsEmails)
   .post("/clients", verifyToken, clientsController.addClient)
   .put("/clients/:id", verifyToken, clientsController.updateClient)
   .delete("/clients/:id", verifyToken, clientsController.deleteClient);
