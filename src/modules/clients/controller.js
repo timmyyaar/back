@@ -4,7 +4,7 @@ const ClientsController = () => {
   const getClients = async (req, res) => {
     try {
       const clients = await pool.query(
-        "SELECT * FROM clients ORDER BY id DESC"
+        "SELECT * FROM clients ORDER BY id DESC",
       );
 
       res.status(200).json(clients.rows);
@@ -36,7 +36,7 @@ const ClientsController = () => {
           firstOrderCreationDate,
           firstOrderDate,
           instagram,
-        ]
+        ],
       );
 
       res.status(200).json(createdClient.rows[0]);
@@ -71,7 +71,7 @@ const ClientsController = () => {
           instagram,
           firstOrderCreationDate,
           firstOrderDate,
-        ]
+        ],
       );
 
       res.status(200).json(updatedClient.rows[0]);
@@ -92,11 +92,26 @@ const ClientsController = () => {
     }
   };
 
+  const getClientsEmails = async (req, res) => {
+    try {
+      const clientsEmails = await pool.query(
+        "SELECT email FROM clients ORDER BY id DESC",
+      );
+
+      res
+        .status(200)
+        .json([...new Set(clientsEmails.rows.map(({ email }) => email))]);
+    } catch (error) {
+      res.status(500).json({ error });
+    }
+  };
+
   return {
     getClients,
     addClient,
     updateClient,
     deleteClient,
+    getClientsEmails,
   };
 };
 
