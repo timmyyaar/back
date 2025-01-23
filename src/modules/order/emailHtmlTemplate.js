@@ -49,8 +49,8 @@ const getEmailHtmlTemplate = (updatedOrder) => {
                         </style>
                     </head>
                     <div style="display: flex; padding-bottom: 6px; border-bottom: 2px solid #C6D3FF;">
-                        <img src="cid:logo@nodemailer.com" alt="" style="height: 89px; margin-top: auto;"/>
-                        <img src="cid:bubbles@nodemailer.com" alt="" style="margin-left: auto;"/>
+                        <img src="cid:logo@nodemailer.com" alt="" style="height: 45px; margin-top: auto;"/>
+                        <img src="cid:bubbles@nodemailer.com" alt="" style="margin-left: auto; height: 80px; width: 80px;"/>
                     </div>
                     <div style="font-size: 18px; line-height: 22px; font-weight: 600; margin-bottom: 24px; margin-top: 24px; color: black;">
                         ${t.dear_client} ${updatedOrder.name},  

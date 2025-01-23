@@ -16,6 +16,7 @@ orderRouter
     verifyToken,
     orderController.getAllClientOrders,
   )
+  .get("/order/orders-count", orderController.getOrdersCount)
   .put("/order/:id", verifyToken, orderController.updateOrder)
   .delete("/order/:id", verifyToken, orderController.deleteOrder)
   .patch("/order/refuse/:id", verifyToken, orderController.refuseOrder)
