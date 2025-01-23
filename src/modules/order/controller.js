@@ -733,11 +733,13 @@ const OrderController = () => {
         [id, ORDER_STATUS.APPROVED, null],
       );
 
+      await updateScheduleForMultipleCleaners(updatedOrder, []);
+
       if (env.getEnvironment("MODE") === "prod") {
         const isDryOrOzonation = [
           ORDER_TITLES.DRY_CLEANING,
           ORDER_TITLES.OZONATION,
-        ].includes(order.title);
+        ].includes(updatedOrder.title);
 
         const approvedChannelId =
           updatedOrder.main_city === CITIES.WARSAW
