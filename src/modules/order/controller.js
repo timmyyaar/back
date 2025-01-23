@@ -733,11 +733,13 @@ const OrderController = () => {
         [id, ORDER_STATUS.APPROVED, null],
       );
 
+      await updateScheduleForMultipleCleaners(updatedOrder, []);
+
       if (env.getEnvironment("MODE") === "prod") {
         const isDryOrOzonation = [
           ORDER_TITLES.DRY_CLEANING,
           ORDER_TITLES.OZONATION,
-        ].includes(order.title);
+        ].includes(updatedOrder.title);
 
         const approvedChannelId =
           updatedOrder.main_city === CITIES.WARSAW
@@ -1270,6 +1272,19 @@ const OrderController = () => {
     }
   };
 
+  const getOrdersCount = async (req, res) => {
+    try {
+      const {
+        rows: [{ count }],
+      } = await pool.query(`SELECT count(*) AS count FROM "order";`);
+
+      return res.status(200).json(count);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error });
+    }
+  };
+
   return {
     getOrder,
     getClientOrder,
@@ -1288,6 +1303,7 @@ const OrderController = () => {
     approvePayment,
     markOrderAsPaid,
     resetOrder,
+    getOrdersCount,
   };
 };
 

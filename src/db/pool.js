@@ -5,7 +5,10 @@ const env = require("../helpers/environments");
 const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
 
 const pool = new Pool({
-  connectionString: `${POSTGRES_URL}?sslmode=require`,
+  connectionString: POSTGRES_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 pool.on("error", (err) => {
