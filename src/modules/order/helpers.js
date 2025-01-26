@@ -71,6 +71,11 @@ const sendConfirmationEmailAndTelegramMessage = async (
           path: __dirname + "/images/bubbles.png",
           cid: "bubbles@nodemailer.com",
         },
+        {
+          filename: "cleaners.png",
+          path: __dirname + "/images/cleaners.png",
+          cid: "cleaners@nodemailer.com",
+        },
       ],
     });
   }
@@ -114,6 +119,11 @@ const scheduleReminder = (date, order, transporter) => {
           filename: "bubbles.png",
           path: __dirname + "/images/bubbles.png",
           cid: "bubbles@nodemailer.com",
+        },
+        {
+          filename: "cleaners.png",
+          path: __dirname + "/images/cleaners.png",
+          cid: "cleaners@nodemailer.com",
         },
       ],
     });
@@ -178,7 +188,7 @@ const sendFeedbackEmailAndSetReminder = async (
     );
   }
 
-  scheduleReminder(nextReminderDate, updatedOrder);
+  scheduleReminder(nextReminderDate, updatedOrder, transporter);
 };
 
 const addOrderToSchedule = async (existingOrder, cleanerId) => {

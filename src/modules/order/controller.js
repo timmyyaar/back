@@ -1272,6 +1272,19 @@ const OrderController = () => {
     }
   };
 
+  const getOrdersCount = async (req, res) => {
+    try {
+      const {
+        rows: [{ count }],
+      } = await pool.query(`SELECT count(*) AS count FROM "order";`);
+
+      return res.status(200).json(count);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error });
+    }
+  };
+
   return {
     getOrder,
     getClientOrder,
@@ -1290,6 +1303,7 @@ const OrderController = () => {
     approvePayment,
     markOrderAsPaid,
     resetOrder,
+    getOrdersCount,
   };
 };
 
