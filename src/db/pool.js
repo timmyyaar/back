@@ -10,7 +10,7 @@ const pool = new Pool({
     rejectUnauthorized: false,
   },
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000,
   max: 50,
 });
 
