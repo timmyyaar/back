@@ -8,10 +8,10 @@ const pool = new Pool({
   connectionString: POSTGRES_URL,
   ssl: {
     rejectUnauthorized: false,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    max: 50,
   },
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  max: 50,
 });
 
 pool.on("error", (err) => {
