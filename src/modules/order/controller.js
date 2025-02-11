@@ -56,6 +56,7 @@ const {
   APPROVED_DRY_OZONATION_CHANNEL_ID,
   APPROVED_REGULAR_CHANNEL_ID,
 } = require("./constants");
+const constants = require("../../constants");
 
 const OrderController = () => {
   const reScheduleReminders = async () => {
@@ -95,6 +96,31 @@ const OrderController = () => {
       return res.json(getOrdersWithCleaners(result.rows));
     } catch (error) {
       return res.status(500).json({ error });
+    }
+  };
+
+  let getOrderCountRetriesCount = 0;
+
+  const getOrdersCount = async (req, res) => {
+    try {
+      const {
+        rows: [{ count }],
+      } = await pool.query(`SELECT count(*) AS count FROM "order";`);
+
+      getOrderCountRetriesCount = 0;
+
+      return res.status(200).json(count);
+    } catch (error) {
+      if (getOrderCountRetriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        getOrderCountRetriesCount++;
+
+        setTimeout(
+          async () => await getOrdersCount(req, res),
+          constants.DEFAULT_RETRIES_DELAY,
+        );
+      } else {
+        return res.status(500).json({ error });
+      }
     }
   };
 
@@ -1268,19 +1294,6 @@ const OrderController = () => {
 
       return res.status(200).json(getOrdersWithCleaners(updatedOrdersResult));
     } catch (error) {
-      return res.status(500).json({ error });
-    }
-  };
-
-  const getOrdersCount = async (req, res) => {
-    try {
-      const {
-        rows: [{ count }],
-      } = await pool.query(`SELECT count(*) AS count FROM "order";`);
-
-      return res.status(200).json(count);
-    } catch (error) {
-      console.log(error);
       return res.status(500).json({ error });
     }
   };
