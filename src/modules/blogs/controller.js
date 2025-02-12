@@ -7,33 +7,32 @@ const env = require("../../helpers/environments");
 const constants = require("../../constants");
 
 const BlogsController = () => {
-  let retriesCount = 0;
-
   const getBlogs = async (req, res) => {
+    let retriesCount = 0;
+
     const { id } = req.params;
 
-    try {
-      const result = id
-        ? await pool.query("SELECT * FROM blogs WHERE id = $1", [id])
-        : await pool.query("SELECT * FROM blogs ORDER BY id DESC");
+    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+      try {
+        const result = id
+          ? await pool.query("SELECT * FROM blogs WHERE id = $1", [id])
+          : await pool.query("SELECT * FROM blogs ORDER BY id DESC");
 
-      retriesCount = 0;
+        if (result.rowCount === 0) {
+          return res.status(404).json({ message: "No blogs found" });
+        }
 
-      if (result.rowCount === 0) {
-        return res.status(404).json({ message: "No blogs found" });
-      }
-
-      return res.json(id ? result.rows[0] : result.rows);
-    } catch (error) {
-      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        return res.json(id ? result.rows[0] : result.rows);
+      } catch (error) {
         retriesCount++;
 
-        setTimeout(
-          async () => await getBlogs(req, res),
-          constants.DEFAULT_RETRIES_DELAY,
-        );
-      } else {
-        return res.status(500).json({ error });
+        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
+          );
+        } else {
+          return res.status(500).json({ error });
+        }
       }
     }
   };

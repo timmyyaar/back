@@ -42,7 +42,7 @@ const STRIPE_PAYMENT_STATUS = {
 
 const CITIES = { WARSAW: "Warsaw", KRAKOW: "Krakow" };
 
-const DEFAULT_RETRIES_COUNT = 3;
+const DEFAULT_RETRIES_COUNT = 4;
 const DEFAULT_RETRIES_DELAY = 3000;
 
 module.exports = {
