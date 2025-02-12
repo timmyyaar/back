@@ -3,25 +3,24 @@ const pool = require("../../db/pool");
 const constants = require("../../constants");
 
 const LocalesController = () => {
-  let retriesCount = 0;
-
   const getLocales = async (req, res) => {
-    try {
-      const result = await pool.query("SELECT * FROM locales");
+    let retriesCount = 0;
 
-      retriesCount = 0;
+    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+      try {
+        const result = await pool.query("SELECT * FROM locales");
 
-      return res.json({ locales: result.rows });
-    } catch (error) {
-      if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+        return res.json({ locales: result.rows });
+      } catch (error) {
         retriesCount++;
 
-        setTimeout(
-          async () => await getLocales(req, res),
-          constants.DEFAULT_RETRIES_DELAY,
-        );
-      } else {
-        return res.status(500).json({ error });
+        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
+          );
+        } else {
+          return res.status(500).json({ error });
+        }
       }
     }
   };
