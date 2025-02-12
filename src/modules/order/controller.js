@@ -99,27 +99,26 @@ const OrderController = () => {
     }
   };
 
-  let getOrderCountRetriesCount = 0;
-
   const getOrdersCount = async (req, res) => {
-    try {
-      const {
-        rows: [{ count }],
-      } = await pool.query(`SELECT count(*) AS count FROM "order";`);
+    let retriesCount = 0;
 
-      getOrderCountRetriesCount = 0;
+    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+      try {
+        const {
+          rows: [{ count }],
+        } = await pool.query(`SELECT count(*) AS count FROM "order";`);
 
-      return res.status(200).json(count);
-    } catch (error) {
-      if (getOrderCountRetriesCount < constants.DEFAULT_RETRIES_COUNT) {
-        getOrderCountRetriesCount++;
+        return res.status(200).json(count);
+      } catch (error) {
+        retriesCount++;
 
-        setTimeout(
-          async () => await getOrdersCount(req, res),
-          constants.DEFAULT_RETRIES_DELAY,
-        );
-      } else {
-        return res.status(500).json({ error });
+        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
+          );
+        } else {
+          return res.status(500).json({ error });
+        }
       }
     }
   };
