@@ -6,7 +6,6 @@ async function requestWithRetry(
   delay = constants.DEFAULT_RETRIES_DELAY,
 ) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      console.log(attempt)
     try {
       return await operation();
     } catch (error) {
