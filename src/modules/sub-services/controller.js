@@ -2,31 +2,28 @@ const pool = require("../../db/pool");
 
 const constants = require("../../constants");
 const { getTransformedSubService } = require("./utils");
+const requestWithRetry = require("../../db/requestWithRetry");
 
 const SubServicesController = () => {
   const getSubServices = async (req, res) => {
-    let retriesCount = 0;
+    const client = await pool.connect();
 
-    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-      try {
-        const { rows } = await pool.query(
-          "SELECT * FROM sub_services ORDER BY id ASC",
-        );
+    try {
+      const { rows } = await requestWithRetry(
+        async () =>
+          await client.query("SELECT * FROM sub_services ORDER BY id ASC"),
+      );
 
-        return res.json(
-          rows.map((subService) => getTransformedSubService(subService)),
-        );
-      } catch (error) {
-        retriesCount++;
-
-        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
-          );
-        } else {
-          return res.status(500).json({ error });
-        }
-      }
+      return res.json(
+        rows.map((subService) => getTransformedSubService(subService)),
+      );
+    } catch (error) {
+      return res.status(500).json({
+        message: "Failed to fetch reviews after multiple attempts",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   };
 

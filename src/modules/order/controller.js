@@ -57,6 +57,7 @@ const {
   APPROVED_REGULAR_CHANNEL_ID,
 } = require("./constants");
 const constants = require("../../constants");
+const requestWithRetry = require("../../db/requestWithRetry");
 
 const OrderController = () => {
   const reScheduleReminders = async () => {
@@ -100,26 +101,24 @@ const OrderController = () => {
   };
 
   const getOrdersCount = async (req, res) => {
-    let retriesCount = 0;
+    const client = await pool.connect();
 
-    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-      try {
-        const {
-          rows: [{ count }],
-        } = await pool.query(`SELECT count(*) AS count FROM "order";`);
+    try {
+      const {
+        rows: [{ count }],
+      } = await requestWithRetry(
+        async () =>
+          await client.query(`SELECT count(*) AS count FROM "order";`),
+      );
 
-        return res.status(200).json(count);
-      } catch (error) {
-        retriesCount++;
-
-        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
-          );
-        } else {
-          return res.status(500).json({ error });
-        }
-      }
+      return res.status(200).json(count);
+    } catch (error) {
+      return res.status(500).json({
+        message: "Failed to fetch orders count after multiple attempts",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   };
 
