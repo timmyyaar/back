@@ -9,6 +9,7 @@ const constants = require("../../constants");
 const { getUpdatedUserRating } = require("../../utils");
 
 const pool = require("../../db/pool");
+const requestWithRetry = require("../../db/requestWithRetry");
 
 const AUTH_COOKIE_EXPIRATION_TIME = 7 * 24 * 60 * 60 * 1000;
 
@@ -134,10 +135,13 @@ const UsersController = () => {
   };
 
   const getMyUser = async (req, res) => {
+    const client = await pool.connect();
+
     try {
-      const result = await pool.query("SELECT * FROM users WHERE id = $1", [
-        req.userId,
-      ]);
+      const result = await requestWithRetry(
+        async () =>
+          await client.query("SELECT * FROM users WHERE id = $1", [req.userId]),
+      );
       const user = getUserWithRating(result.rows[0]);
 
       res.json({
@@ -151,7 +155,12 @@ const UsersController = () => {
         cities: user.cities,
       });
     } catch (error) {
-      res.status(500).json({ error });
+      return res.status(500).json({
+        message: "Failed to fetch user after multiple attempts",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   };
 
