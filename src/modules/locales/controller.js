@@ -1,27 +1,25 @@
 const pool = require("../../db/pool");
 
 const constants = require("../../constants");
+const requestWithRetry = require("../../db/requestWithRetry");
 
 const LocalesController = () => {
   const getLocales = async (req, res) => {
-    let retriesCount = 0;
+    const client = await pool.connect();
 
-    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-      try {
-        const result = await pool.query("SELECT * FROM locales");
+    try {
+      const result = await requestWithRetry(
+        async () => await client.query("SELECT * FROM locales"),
+      );
 
-        return res.json({ locales: result.rows });
-      } catch (error) {
-        retriesCount++;
-
-        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
-          );
-        } else {
-          return res.status(500).json({ error });
-        }
-      }
+      return res.json({ locales: result.rows });
+    } catch (error) {
+      return res.status(500).json({
+        message: "Failed to fetch locales after multiple attempts",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   };
 

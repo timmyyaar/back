@@ -1,40 +1,37 @@
 const pool = require("../../db/pool");
 
 const constants = require("../../constants");
+const requestWithRetry = require("../../db/requestWithRetry");
 
 const MainServicesController = () => {
   const getMainServices = async (req, res) => {
-    let retriesCount = 0;
+    const client = await pool.connect();
 
-    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-      try {
-        const { rows } = await pool.query(
-          "SELECT * FROM main_services ORDER BY id ASC",
-        );
+    try {
+      const { rows } = await requestWithRetry(
+        async () =>
+          await client.query("SELECT * FROM main_services ORDER BY id ASC"),
+      );
 
-        return res.json(
-          rows.map((mainService) => {
-            const { disabled_cities, ...rest } = mainService;
+      return res.json(
+        rows.map((mainService) => {
+          const { disabled_cities, ...rest } = mainService;
 
-            return {
-              ...rest,
-              disabledCities: disabled_cities
-                ? disabled_cities.split(",").filter((item) => item)
-                : [],
-            };
-          }),
-        );
-      } catch (error) {
-        retriesCount++;
-
-        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
-          );
-        } else {
-          return res.status(500).json({ error });
-        }
-      }
+          return {
+            ...rest,
+            disabledCities: disabled_cities
+              ? disabled_cities.split(",").filter((item) => item)
+              : [],
+          };
+        }),
+      );
+    } catch (error) {
+      return res.status(500).json({
+        message: "Failed to fetch locales after multiple attempts",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   };
 

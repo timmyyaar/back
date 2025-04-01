@@ -4,36 +4,33 @@ const { put, del } = require("@vercel/blob");
 const { formidable } = require("formidable");
 
 const env = require("../../helpers/environments");
-const constants = require("../../constants");
+const requestWithRetry = require("../../db/requestWithRetry");
 
 const BlogsController = () => {
   const getBlogs = async (req, res) => {
-    let retriesCount = 0;
-
     const { id } = req.params;
 
-    while (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-      try {
-        const result = id
-          ? await pool.query("SELECT * FROM blogs WHERE id = $1", [id])
-          : await pool.query("SELECT * FROM blogs ORDER BY id DESC");
+    const client = await pool.connect();
 
-        if (result.rowCount === 0) {
-          return res.status(404).json({ message: "No blogs found" });
-        }
+    try {
+      const result = await requestWithRetry(async () => {
+        return id
+          ? await client.query("SELECT * FROM blogs WHERE id = $1", [id])
+          : await client.query("SELECT * FROM blogs ORDER BY id DESC");
+      });
 
-        return res.json(id ? result.rows[0] : result.rows);
-      } catch (error) {
-        retriesCount++;
-
-        if (retriesCount < constants.DEFAULT_RETRIES_COUNT) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, constants.DEFAULT_RETRIES_DELAY),
-          );
-        } else {
-          return res.status(500).json({ error });
-        }
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "No blogs found" });
       }
+
+      return res.json(id ? result.rows[0] : result.rows);
+    } catch (error) {
+      return res.status(500).json({
+        message: "Failed to fetch blogs after multiple attempts",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   };
 
