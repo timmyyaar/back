@@ -8,14 +8,14 @@ const requestWithRetry = require("../../db/requestWithRetry");
 
 const BlogsController = () => {
   const getBlogs = async (req, res) => {
-    const { id } = req.params;
+    const { key } = req.params;
 
     const client = await pool.connect();
 
     try {
       const result = await requestWithRetry(async () => {
-        return id
-          ? await client.query("SELECT * FROM blogs WHERE id = $1", [id])
+        return key
+          ? await client.query("SELECT * FROM blogs WHERE key = $1", [key])
           : await client.query("SELECT * FROM blogs ORDER BY id DESC");
       });
 
@@ -23,7 +23,7 @@ const BlogsController = () => {
         return res.json([]);
       }
 
-      return res.json(id ? result.rows[0] : result.rows);
+      return res.json(key ? result.rows[0] : result.rows);
     } catch (error) {
       return res.status(500).json({
         message: "Failed to fetch blogs after multiple attempts",
