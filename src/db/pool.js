@@ -7,12 +7,13 @@ const POSTGRES_URL = env.getEnvironment("POSTGRES_URL");
 const pool = new Pool({
   connectionString: POSTGRES_URL,
   ssl: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: true,
   },
-  max: 1,
-  keepAlive: false,
-  idleTimeoutMillis: 1000,
-  connectionTimeoutMillis: 5000,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on("error", (err) => {
