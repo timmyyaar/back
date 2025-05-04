@@ -7,7 +7,7 @@ const blogsController = require("./controller");
 const blogsRouter = new Router();
 
 blogsRouter
-  .get("/blogs/:id?", blogsController.getBlogs)
+  .get("/blogs/:key?", blogsController.getBlogs)
   .post("/blogs", verifyToken, blogsController.addBlog)
   .put("/blogs/:id", verifyToken, blogsController.editBlog)
   .delete("/blogs/:id", verifyToken, blogsController.deleteBlog);
