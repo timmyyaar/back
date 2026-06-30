@@ -424,6 +424,8 @@ const OrderController = () => {
         ]);
       }
 
+      await updateScheduleForMultipleCleaners(existingOrder, []);
+
       if (needToCancelPaymentIntent) {
         await stripe.paymentIntents.cancel(existingOrder.payment_intent);
       }
